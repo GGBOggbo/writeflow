@@ -1,127 +1,187 @@
-# AI Writing MVP
+# Writeflow — 主编陪跑型 AI 共创工作台
 
-This project is a local MVP for an AI-assisted Chinese long-form writing workflow.
+把一个想法逐步打磨成可发布稿件的 AI 写作工作台。
 
-Current scope:
+## 功能概览
 
-- dual-panel writing UI
-- workflow state machine
-- `localStorage` persistence
-- typed AI API routes
-- `mock` provider as the fallback backend
-- `openai` / `anthropic` provider placeholders for future integration
-- `mimo` provider with a full real main-flow path:
-  - `topics`
-  - `brief`
-  - `outline`
-  - `draft`
-  - `meta`
-- search-enhanced generation design in progress:
-  - `topics` default network enhancement
-  - `meta` default network enhancement
-  - `brief` / `outline` manual enhancement reserved
-  - `draft` permanently offline by design
+- **7 步写作工作流**：想法 → 选题 → 提纲 → 大纲 → 正文 → 标题摘要 → 定稿
+- **双面板编辑器**：左侧主编台 + 右侧成稿工作台
+- **状态机驱动**：每一步的状态转换都有严格的前置条件校验
+- **本地持久化**：所有进度自动保存在 localStorage，刷新不丢失
+- **多 AI 提供商**：支持 Mock（默认回退）、Mimo（小米）、OpenAI、Anthropic
+- **联网搜索增强**：选题阶段可选联网搜索，后续阶段自动复用搜索上下文
 
-## Getting Started
+## 技术栈
 
-Install dependencies and start the dev server:
+| 技术 | 版本 |
+|------|------|
+| Next.js | 16.2.7 |
+| React | 19.2 |
+| TypeScript | 5.x |
+| Tailwind CSS | 4.x |
+| Zod | 4.x |
+| Vitest | 4.x |
+
+## 快速开始
 
 ```bash
+# 安装依赖
 npm install
+
+# 配置环境变量
+cp .env.example .env.local
+
+# 启动开发服务器
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+打开 http://localhost:3000 即可使用。
 
-## Environment Variables
+## 环境变量
 
-Copy the example file first:
-
-```bash
-cp .env.example .env.local
-```
-
-Supported provider values:
-
-- `AI_PROVIDER=mock`
-- `AI_PROVIDER=openai`
-- `AI_PROVIDER=anthropic`
-- `AI_PROVIDER=mimo`
-
-Example variables:
+在 `.env.local` 中配置：
 
 ```bash
+# AI 提供商：mock | mimo | openai | anthropic
 AI_PROVIDER=mock
 
-OPENAI_API_KEY=
-OPENAI_MODEL=
-
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=
-
+# Mimo（小米）
 MIMO_API_KEY=
 MIMO_MODEL=mimo-v2.5-pro
 MIMO_BASE_URL=https://token-plan-cn.xiaomimimo.com/v1
+
+# OpenAI
+OPENAI_API_KEY=
+OPENAI_MODEL=
+
+# Anthropic
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=
+
+# 搜索提供商：disabled | bocha | jizhila
+SEARCH_PROVIDER=disabled
+
+# 机智拉（公众号搜索）
+JIZHILA_API_KEY=
+JIZHILA_VERIFY_CODE=
+
+# 搜索增强开关
+JIZHILA_ENRICH_READ_ZAN=false
+JIZHILA_ENRICH_LIMIT=5
+JIZHILA_ENRICH_ARTICLE_HTML=false
+JIZHILA_ENRICH_ARTICLE_LIMIT=2
+JIZHILA_ENRICH_COMMENTS=false
+JIZHILA_ENRICH_COMMENT_LIMIT=2
+JIZHILA_ENRICH_COMMENT_TOP_N=10
 ```
 
-## Provider Behavior
+## 写作工作流
 
-### Mock provider
+```
+想法输入 → 选题生成 → Brief 确认 → 大纲审阅 → 正文生成 → 标题摘要 → 定稿出稿
+  ①          ②           ③          ④          ⑤          ⑥          ⑦
+```
 
-`AI_PROVIDER=mock` remains the safe fallback. The current MVP should keep working exactly as before in this mode.
+| 步骤 | 说明 |
+|------|------|
+| ① 想法 | 把要写的命题说清楚 |
+| ② 选题 | AI 生成 3 个选题方向，用户选择一个 |
+| ③ 提纲 | 生成创作策略单（目标/受众/人设/语气） |
+| ④ 大纲 | 搭建文章骨架和素材槽位 |
+| ⑤ 正文 | 基于大纲生成完整初稿 |
+| ⑥ 包装 | 生成 5 个标题 + 3 条摘要 + 封面建议 |
+| ⑦ 定稿 | 选择最终版本，一键复制 |
 
-### Real provider placeholders
+## 联网搜索
 
-`openai` and `anthropic` are scaffolded, but not fully wired to real model calls yet.
+当前搜索规则：
 
-- If `AI_PROVIDER=openai` and `OPENAI_API_KEY` is missing, the API returns a clear error.
-- If `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` is missing, the API returns a clear error.
-- If keys are present, the provider still returns a clear "not implemented yet" message for now.
+| 阶段 | 联网搜索 | 说明 |
+|------|---------|------|
+| 选题 | 用户可选 | 实时搜索公众号文章 |
+| 提纲 | 自动复用 | 复用选题搜索结果 |
+| 大纲 | 自动复用 | 复用选题搜索结果 |
+| 正文 | 永远断网 | 保护成稿真实感 |
+| 标题摘要 | 自动复用 | 复用选题搜索结果 |
 
-This keeps the frontend stable while the real integration pipeline is being prepared.
+搜索增强流程：
 
-### Mimo provider
+```
+web_search（最多 15 条）
+    → 截取前 8 篇
+    → 粗筛 5 篇补互动数据（read_zan_pro）
+    → 精筛 2 篇抓全文（article_html）
+    → 有评论的深拆文章抓评论（article_comment2）
+    → 智能排序后取前 4 篇给模型参考
+```
 
-`mimo` is now the first fully wired real provider for the MVP main flow:
+## AI 提供商
 
-- `topics` is wired to Xiaomi MiMo's OpenAI-compatible `/chat/completions` endpoint
-- `brief`, `outline`, `draft`, and `meta` are also wired through the same provider path
-- missing `MIMO_API_KEY` returns a clear error
-- `MIMO_BASE_URL` defaults to the China token-plan endpoint if omitted
+### Mock（默认）
 
-## Search Enhancement
+开箱即用的回退模式，不需要任何 API Key，返回固定假数据。
 
-The current product rule for network search is:
+### Mimo（小米）
 
-- `Idea`: always offline
-- `Topics`: online by default
-- `Brief`: offline by default, manual enhancement reserved
-- `Outline`: offline by default, manual enhancement reserved
-- `Draft`: always offline
-- `Meta`: online by default
+第一个完全接入的真实 AI 提供商，通过 OpenAI 兼容接口调用小米 MiMo 模型。需要配置 `MIMO_API_KEY`。
 
-Search is designed as a separate layer from model generation. Fresh search context is sanitized first, then passed into allowed prompts as references only.
+### OpenAI / Anthropic
 
-Search failures must degrade gracefully and never block generation.
+已占位，尚未完全接入。缺少 API Key 时会返回明确错误提示。
 
-## Prompt Modules
+## 项目结构
 
-Prompt builders now live in `lib/ai/prompts/`:
+```
+app/
+  api/ai/           # API 路由层（topics / brief / outline / draft / meta）
+  layout.tsx         # 根布局（zh-CN）
+  page.tsx           # 首页入口
 
-- `system.ts`
-- `topics.ts`
-- `brief.ts`
-- `outline.ts`
-- `draft.ts`
-- `meta.ts`
-- `edit.ts`
+components/
+  stages/            # 各阶段 UI 组件（idea / topic / brief / outline / draft / meta / final）
+  hooks/
+    use-workflow.ts  # 工作流核心 Hook（状态管理 + API 调用）
+  app-client.tsx     # 客户端根组件
+  workspace-shell.tsx # 双面板容器
+  chat-panel.tsx     # 左侧主编台
+  manuscript-panel.tsx # 右侧成稿工作台
 
-These modules align prompt inputs with the current typed contracts and Zod response schemas.
+lib/
+  ai/                # AI 服务层
+    service.ts       # 服务入口（搜索 + 模型调用）
+    provider.ts      # 提供商接口
+    real-provider.ts # Mimo 实现
+    prompts/         # 各阶段 Prompt 模板
+    schemas.ts       # Zod 请求/响应校验
+  search/            # 搜索增强层
+    service.ts       # 搜索服务入口
+    jizhila-provider.ts  # 机智拉搜索提供商
+    jizhila-selection.ts # 智能文章筛选和打分
+    normalize.ts     # 搜索结果标准化
+  state-machine.ts   # 工作流状态机
+  storage/           # localStorage 持久化
 
-## Current Focus
+types/
+  workflow.ts        # 工作流类型（状态、事件、数据模型）
+  ai.ts              # AI 接口类型（输入/输出契约）
+```
 
-The next implementation phase is:
+## 测试
 
-1. complete the search service layer and provider abstraction
-2. finish `topics` + `meta` network-enhanced generation
-3. expose safe per-stage search controls in the UI
+```bash
+# 运行所有测试
+npm test
+
+# 监听模式
+npm run test:watch
+
+# 代码检查
+npm run lint
+
+# 构建
+npm run build
+```
+
+## License
+
+MIT
