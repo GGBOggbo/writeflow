@@ -1,11 +1,11 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
-import Database from "better-sqlite3";
+import { Pool } from "@neondatabase/serverless";
 
-const db = new Database("data/auth.sqlite");
+const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 
 export const auth = betterAuth({
-  database: db,
+  database: pool,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,

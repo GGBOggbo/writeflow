@@ -5,16 +5,18 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "better-auth": "^1.6.16",
-    "better-sqlite3": "^12.10.0",
     "next": "16.2.7",
     "nodemailer": "^8.0.10",
+    "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.4",
@@ -25,7 +27,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.20",
     "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",

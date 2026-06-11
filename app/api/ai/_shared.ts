@@ -57,14 +57,14 @@ export async function meteredJsonResponse<TInput extends MeteredInput, TOutput>(
   const userId = session.user.id;
 
   try {
-    creditStore.reserve(userId, stage, input.operationId);
+    await creditStore.reserve(userId, stage, input.operationId);
   } catch (error) {
     return creditErrorResponse(error);
   }
 
   try {
     const result = await handler(input);
-    const balance = creditStore.consume(userId, input.operationId);
+    const balance = await creditStore.consume(userId, input.operationId);
     return NextResponse.json(result, {
       headers: {
         "X-Credits-Remaining": balanceHeader(balance),
@@ -72,7 +72,7 @@ export async function meteredJsonResponse<TInput extends MeteredInput, TOutput>(
     });
   } catch (error) {
     try {
-      creditStore.refund(userId, input.operationId);
+      await creditStore.refund(userId, input.operationId);
     } catch {
       // Preserve the generation error; operation state remains auditable.
     }

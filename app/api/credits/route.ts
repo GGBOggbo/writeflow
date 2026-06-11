@@ -9,5 +9,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "请先登录后再使用。" }, { status: 401 });
   }
 
-  return NextResponse.json(creditStore.getBalance(session.user.id));
+  return NextResponse.json(await creditStore.getBalance(session.user.id));
 }

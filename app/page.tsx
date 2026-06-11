@@ -6,7 +6,7 @@ import { creditStore } from "@/lib/credits";
 export default async function Home() {
   const session = await auth.api.getSession({ headers: await headers() });
   const initialCreditBalance = session?.user
-    ? creditStore.getBalance(session.user.id)
+    ? await creditStore.getBalance(session.user.id)
     : null;
 
   return <AppClient initialCreditBalance={initialCreditBalance} />;

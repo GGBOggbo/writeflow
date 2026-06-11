@@ -62,7 +62,7 @@ export async function streamJsonResponse<
   const userId = session.user.id;
 
   try {
-    creditStore.reserve(userId, stage, input.operationId);
+    await creditStore.reserve(userId, stage, input.operationId);
   } catch (error) {
     const status =
       error instanceof InsufficientCreditsError
@@ -86,12 +86,12 @@ export async function streamJsonResponse<
           write(controller, encoder, { type: "progress", event });
         });
 
-        const balance = creditStore.consume(userId, input.operationId);
+        const balance = await creditStore.consume(userId, input.operationId);
         write(controller, encoder, { type: "credits", balance });
         write(controller, encoder, { type: "result", data: result });
       } catch (error) {
         try {
-          creditStore.refund(userId, input.operationId);
+          await creditStore.refund(userId, input.operationId);
         } catch {
           // Preserve the generation error; operation state remains auditable.
         }
