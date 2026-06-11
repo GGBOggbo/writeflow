@@ -270,6 +270,27 @@ describe("workflow state machine", () => {
     expect(next.selectedDraftVersionId).toBe("draft-1");
   });
 
+  it("appends and selects a separately generated humanized draft", () => {
+    const state = {
+      ...createInitialWorkflowState(),
+      draftVersions: [
+        { id: "draft-1", label: "原始版", content: "原始正文" },
+      ],
+      selectedDraftVersionId: "draft-1",
+    };
+    const next = transitionWorkflow(state, {
+      type: "draft_humanized",
+      draft: {
+        id: "draft-1-humanized",
+        label: "去 AI 版",
+        content: "自然正文",
+      },
+    });
+
+    expect(next.draftVersions).toHaveLength(2);
+    expect(next.selectedDraftVersionId).toBe("draft-1-humanized");
+  });
+
   it("keeps enriched topic search context after draft versions are generated", () => {
     const state = {
       ...createInitialWorkflowState(),

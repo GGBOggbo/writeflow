@@ -154,6 +154,7 @@ describe("search toggle placement", () => {
 
     expect(await screen.findByText("结构审稿：先看骨架，再看素材")).toBeInTheDocument();
     expect(screen.queryByText("复用选题参考")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "去除 AI 味" })).not.toBeInTheDocument();
   });
 
   it("does not render a reference toggle on the draft stage", async () => {

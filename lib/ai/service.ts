@@ -12,6 +12,8 @@ import type {
   GenerateBriefOutput,
   GenerateDraftInput,
   GenerateDraftOutput,
+  HumanizeDraftInput,
+  HumanizeDraftOutput,
   GenerateOutlineInput,
   GenerateOutlineOutput,
   GenerateTitlesAndSummariesInput,
@@ -29,6 +31,7 @@ import { searchForTopics } from "@/lib/search/service";
 import {
   briefResponseSchema,
   draftResponseSchema,
+  humanizeDraftResponseSchema,
   metaResponseSchema,
   outlineResponseSchema,
   topicResponseSchema,
@@ -98,6 +101,13 @@ function assertHumanizedDraftsPreserveSource(
       throw new Error("去 AI 润色改变了素材占位符。");
     }
   });
+}
+
+function labelOriginalDrafts(drafts: GenerateDraftOutput["drafts"]) {
+  return drafts.map((draft) => ({
+    ...draft,
+    label: "原始版",
+  }));
 }
 
 async function summarizeDraftBenchmarks(
@@ -271,47 +281,48 @@ export async function generateDraft(
     label: "生成正文初稿完成",
   });
 
+  return draftResponseSchema.parse({
+    ...providerResult,
+    drafts: labelOriginalDrafts(providerResult.drafts),
+    searchContext: enrichedSearchContext ?? undefined,
+  });
+}
+
+export async function humanizeDraft(
+  input: HumanizeDraftInput,
+  options?: { onProgress?: ProgressReporter }
+): Promise<HumanizeDraftOutput> {
   options?.onProgress?.({
     stepId: "draft_humanization_started",
     label: "去掉机器腔",
     detail: "终审句式、节奏和表达痕迹",
   });
 
-  try {
-    const humanizedResult = await provider.humanizeDrafts({
-      drafts: providerResult.drafts,
-      coreViewpoint: input.coreViewpoint,
-      briefPersona: input.briefPersona,
-      briefTone: input.briefTone,
-      briefDropOffPoint: input.briefDropOffPoint,
-    });
-    assertHumanizedDraftsPreserveSource(
-      providerResult.drafts,
-      humanizedResult.drafts
-    );
-    options?.onProgress?.({
-      stepId: "draft_humanization_completed",
-      label: "去掉机器腔完成",
-    });
+  const providerResult = await getProvider().humanizeDrafts({
+    drafts: [input.draft],
+    coreViewpoint: input.coreViewpoint,
+    briefPersona: input.briefPersona,
+    briefTone: input.briefTone,
+    briefDropOffPoint: input.briefDropOffPoint,
+  });
+  assertHumanizedDraftsPreserveSource([input.draft], providerResult.drafts);
+  const rewritten = providerResult.drafts[0];
 
-    return draftResponseSchema.parse({
-      ...providerResult,
-      drafts: humanizedResult.drafts,
-      searchContext: enrichedSearchContext ?? undefined,
-      humanizationStatus: "success",
-    });
-  } catch {
-    options?.onProgress?.({
-      stepId: "draft_humanization_completed",
-      label: "保留原始正文",
-      detail: "终审润色未完成，已安全保留初稿",
-    });
+  if (!rewritten) {
+    throw new Error("去 AI 润色没有返回正文。");
   }
 
-  return draftResponseSchema.parse({
-    ...providerResult,
-    searchContext: enrichedSearchContext ?? undefined,
-    humanizationStatus: "degraded",
+  options?.onProgress?.({
+    stepId: "draft_humanization_completed",
+    label: "去掉机器腔完成",
+  });
+
+  return humanizeDraftResponseSchema.parse({
+    draft: {
+      ...rewritten,
+      id: `${input.draft.id}-humanized`,
+      label: "去 AI 版",
+    },
   });
 }
 

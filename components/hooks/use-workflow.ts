@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   generateBrief,
   generateDraft,
+  humanizeDraft,
   generateOutline,
   generateTitlesAndSummaries,
   generateTopics,
@@ -34,6 +35,7 @@ type WorkflowAction =
   | "select_topic"
   | "confirm_brief"
   | "generate_drafts"
+  | "humanize_draft"
   | "generate_meta";
 
 type RequestStatus = {
@@ -425,9 +427,6 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
           searchContext: result.searchContext,
         })
       );
-      if (result.humanizationStatus === "degraded") {
-        setError("去 AI 润色暂未完成，本次已保留原始正文。");
-      }
     } catch (err) {
       failRequest(
         requestId,
@@ -446,6 +445,61 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
       ...state,
       selectedDraftVersionId: draftId,
     });
+  };
+
+  const handleHumanizeDraft = async (retryOperationId?: string) => {
+    if (!state.brief) {
+      return;
+    }
+
+    const selectedTopic = getSelectedTopic(state);
+    const originalDraft =
+      state.draftVersions.find((draft) => draft.label === "原始版") ??
+      state.draftVersions[0];
+
+    if (!selectedTopic || !originalDraft) {
+      setError("未找到可处理的原始正文。");
+      return;
+    }
+
+    const action = "humanize_draft";
+    const operationId = retryOperationId ?? createOperationId();
+    const requestId = startRequest(action, "正在去掉正文里的机器腔...");
+
+    try {
+      setError(null);
+      const result = await humanizeDraft(
+        {
+          operationId,
+          draft: originalDraft,
+          coreViewpoint: selectedTopic.coreViewpoint,
+          briefPersona: state.brief.persona,
+          briefTone: state.brief.tone,
+          briefDropOffPoint: state.brief.dropOffPoint,
+        },
+        recordProgress(requestId),
+        setCreditBalance
+      );
+      if (!isActiveRequest(requestId)) {
+        return;
+      }
+      updateState(
+        transitionWorkflow(state, {
+          type: "draft_humanized",
+          draft: result.draft,
+        })
+      );
+    } catch (err) {
+      failRequest(
+        requestId,
+        action,
+        operationId,
+        err,
+        "去 AI 味失败，原始正文未受影响。"
+      );
+    } finally {
+      finishRequest(requestId);
+    }
   };
 
   const handleGenerateMeta = async (retryOperationId?: string) => {
@@ -654,6 +708,11 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
       return;
     }
 
+    if (action === "humanize_draft") {
+      void handleHumanizeDraft(operationId);
+      return;
+    }
+
     if (action === "generate_meta") {
       void handleGenerateMeta(operationId);
     }
@@ -697,6 +756,7 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
     handleStructureTypeChange,
     handleConfirmBrief,
     handleGenerateDrafts,
+    handleHumanizeDraft,
     handleSelectDraft,
     handleGenerateMeta,
     handleContinueToFinal,

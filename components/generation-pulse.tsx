@@ -7,6 +7,7 @@ type GenerationAction =
   | "select_topic"
   | "confirm_brief"
   | "generate_drafts"
+  | "humanize_draft"
   | "generate_meta";
 
 type GenerationPulseStep = {
@@ -57,7 +58,10 @@ const actionTimelines: Record<GenerationAction, GenerationPulseStep[]> = {
     { label: "AI 总结对标文", detail: "提炼卡点、结构和节奏", eventIds: ["benchmark_summary_started", "benchmark_summary_completed"] },
     { label: "吸收评论卡点", detail: "把高赞评论转成读者需求", eventIds: ["benchmark_summary_completed"] },
     { label: "生成正文初稿", detail: "按大纲和人设组装成稿", eventIds: ["draft_generation_started", "draft_generation_completed"] },
-    { label: "去掉机器腔", detail: "终审句式、节奏和表达痕迹", eventIds: ["draft_humanization_started", "draft_humanization_completed"] },
+  ],
+  humanize_draft: [
+    { label: "检查机器痕迹", detail: "识别公式句、宣传腔和机械节奏", eventIds: ["draft_humanization_started"] },
+    { label: "去掉机器腔", detail: "保留原意，重新整理句式与节奏", eventIds: ["draft_humanization_started", "draft_humanization_completed"] },
   ],
   generate_meta: [
     { label: "读取正文", detail: "只基于已选正文包装", eventIds: ["meta_generation_started"] },

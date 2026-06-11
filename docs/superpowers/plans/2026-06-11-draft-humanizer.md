@@ -62,3 +62,41 @@
 - [x] Run `npm run build`.
 - [x] Run `git diff --check`.
 - [x] Confirm the draft route still reserves and consumes one operation around both model calls.
+
+### Task 5: User-Controlled Humanization and Version Choice
+
+**Files:**
+- Modify: `types/workflow.ts`
+- Modify: `types/ai.ts`
+- Modify: `lib/ai/schemas.ts`
+- Modify: `lib/ai/service.ts`
+- Modify: `components/hooks/use-workflow.ts`
+- Modify: `components/stages/outline-stage.tsx`
+- Modify: relevant tests
+
+- [x] Add failing tests for the default-enabled switch, disabled request behavior, two returned versions, and default humanized selection.
+- [x] Add persisted workflow state and request contract for `humanizeEnabled`.
+- [x] Skip the second request when disabled.
+- [x] Return `去 AI 版` followed by `原始版` when enabled so the state machine selects the humanized version.
+- [x] Run focused and full verification.
+
+### Task 6: Move Humanization After Draft Delivery
+
+**Files:**
+- Create: `app/api/ai/humanize/route.ts`
+- Create: `app/api/ai/humanize/stream/route.ts`
+- Modify: `lib/credits.ts`
+- Modify: `types/ai.ts`
+- Modify: `lib/ai/schemas.ts`
+- Modify: `lib/ai/service.ts`
+- Modify: `lib/ai/client.ts`
+- Modify: `components/hooks/use-workflow.ts`
+- Modify: `components/stages/outline-stage.tsx`
+- Modify: `components/stages/draft-stage.tsx`
+- Modify: relevant tests
+
+- [x] Restore draft generation to one original version and one `draft` charge.
+- [x] Add a separately metered `humanize` API operation.
+- [x] Add the paid action to draft review and append/select the result.
+- [x] Preserve retry idempotency and refund failures.
+- [x] Run focused and full verification.

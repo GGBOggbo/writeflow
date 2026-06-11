@@ -117,6 +117,7 @@ export type WorkflowEvent =
       drafts: DraftVersion[];
       searchContext?: import("@/lib/search/types").SearchReferenceBundle;
     }
+  | { type: "draft_humanized"; draft: DraftVersion }
   | {
       type: "meta_generated";
       titles: MetaCard[];

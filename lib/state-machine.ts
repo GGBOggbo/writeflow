@@ -140,6 +140,15 @@ export function transitionWorkflow(
         selectedDraftVersionId: event.drafts[0]?.id ?? null,
         topicSearchContext: event.searchContext ?? state.topicSearchContext,
       };
+    case "draft_humanized":
+      return {
+        ...state,
+        draftVersions: [
+          ...state.draftVersions.filter((draft) => draft.id !== event.draft.id),
+          event.draft,
+        ],
+        selectedDraftVersionId: event.draft.id,
+      };
     case "meta_generated":
       return {
         ...state,

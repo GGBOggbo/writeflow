@@ -9,6 +9,7 @@ export const AI_STAGES = [
   "brief",
   "outline",
   "draft",
+  "humanize",
   "meta",
 ] as const;
 

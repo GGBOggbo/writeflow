@@ -9,8 +9,10 @@ persona, material placeholders, and commercial conclusion.
 ## Product Rules
 
 - Humanization applies only to generated body copy.
-- Draft generation and humanization are one paid workflow and cost 1 credit total.
-- Users only receive the humanized draft when the second model call succeeds.
+- Draft generation always returns the original draft and costs 1 credit.
+- The draft review page exposes a separate `去 AI 味` action.
+- Each humanization request costs another 1 credit.
+- A successful request appends a `去 AI 版` and selects it while retaining the original.
 - If humanization fails, the original draft is returned with a non-blocking notice.
 - The humanizer must not invent facts, experiences, examples, data, or attribution.
 - Material placeholders using `【💡需要你补充：...】` must remain byte-for-byte present.
@@ -22,18 +24,15 @@ The AI provider gains a focused `humanizeDrafts` operation. The real provider ma
 a second model request using a condensed Chinese Humanizer editorial prompt. The
 mock provider returns its drafts unchanged.
 
-`generateDraft` remains the workflow owner:
+Draft generation and humanization are separate metered workflows:
 
-1. summarize benchmark material when available;
-2. generate the original draft;
-3. emit a humanization progress event;
-4. request an editorial rewrite;
-5. validate draft identity and material placeholders;
-6. return the rewritten draft, or fall back to the original draft on any failure.
+1. `generateDraft` summarizes benchmarks and returns only the original draft.
+2. `humanizeDraft` receives the selected original draft and requests an editorial rewrite.
+3. The service validates draft identity and material placeholders.
+4. The client appends the successful rewrite as a new version and selects it.
 
-The route-level credit wrapper remains unchanged. It reserves and consumes one
-`draft` operation around the complete service call, so both model requests share
-one credit.
+The route-level credit wrapper uses separate `draft` and `humanize` stages. Each
+user action has its own operation UUID, reservation, consumption, retry, and refund.
 
 ## Humanizer Rules
 
@@ -49,6 +48,8 @@ Chinese public-account articles:
 - never fabricate personal voice by inventing experiences or feelings.
 
 The model returns the existing draft JSON structure and no review notes or scores.
+After validation, the service assigns a new ID and `去 AI 版` label while retaining
+the original draft as `原始版`.
 
 ## Failure Handling
 

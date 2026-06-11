@@ -92,7 +92,18 @@ export type GenerateDraftInput = {
 export type GenerateDraftOutput = {
   drafts: DraftVersion[];
   searchContext?: SearchReferenceBundle;
-  humanizationStatus?: "success" | "degraded";
+};
+
+export type HumanizeDraftInput = {
+  draft: DraftVersion;
+  coreViewpoint: string;
+  briefPersona: string;
+  briefTone: string;
+  briefDropOffPoint: string;
+};
+
+export type HumanizeDraftOutput = {
+  draft: DraftVersion;
 };
 
 export type HumanizeDraftsInput = {

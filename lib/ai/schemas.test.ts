@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   briefRequestSchema,
   briefResponseSchema,
+  humanizeDraftRequestSchema,
   metaResponseSchema,
   outlineRequestSchema,
   outlineResponseSchema,
@@ -64,6 +65,19 @@ describe("AI schemas", () => {
         idea: "公众号 AI 写作流程",
       }).success
     ).toBe(false);
+  });
+
+  it("accepts a separately metered draft humanization request", () => {
+    expect(
+      humanizeDraftRequestSchema.safeParse({
+        operationId,
+        draft: { id: "draft-1", label: "原始版", content: "原始正文" },
+        coreViewpoint: "先验证再优化。",
+        briefPersona: "实战派负责人",
+        briefTone: "务实",
+        briefDropOffPoint: "让读者先行动。",
+      }).success
+    ).toBe(true);
   });
 
   it("normalizes topic responses into the new structured topic fields", () => {

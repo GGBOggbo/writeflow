@@ -3,7 +3,12 @@
 import { useWorkflowContext } from "../workflow-context";
 
 export function OutlineStage() {
-  const { state, loading, canGenerate, handleGenerateDrafts } =
+  const {
+    state,
+    loading,
+    canGenerate,
+    handleGenerateDrafts,
+  } =
     useWorkflowContext();
   const outlineHeadings = new Map(
     state.outline.map((section) => [section.id, section.heading])

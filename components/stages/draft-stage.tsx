@@ -4,12 +4,24 @@ import { useWorkflowContext } from "../workflow-context";
 import { ProseText } from "../prose-text";
 
 export function DraftStage() {
-  const { state, loading, canGenerate, handleSelectDraft, handleGenerateMeta } =
-    useWorkflowContext();
+  const {
+    state,
+    loading,
+    canGenerate,
+    requestStatus,
+    handleSelectDraft,
+    handleHumanizeDraft,
+    handleGenerateMeta,
+  } = useWorkflowContext();
 
   const activeDraft =
     state.draftVersions.find((draft) => draft.id === state.selectedDraftVersionId) ??
     state.draftVersions[0];
+  const hasHumanizedDraft = state.draftVersions.some(
+    (draft) => draft.label === "去 AI 版"
+  );
+  const isHumanizing =
+    loading && requestStatus?.action === "humanize_draft";
 
   return (
     <section className="space-y-6">
@@ -60,18 +72,34 @@ export function DraftStage() {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="rounded-full bg-[#233044] px-5 py-3 text-sm font-semibold text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:bg-stone-300"
-        onClick={() => void handleGenerateMeta()}
-        disabled={loading || !canGenerate}
-      >
-        {loading
-          ? "正在生成标题摘要..."
-          : canGenerate
-            ? "生成标题和摘要"
-            : "积分不足"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          className="rounded-full border border-[rgba(35,48,68,0.16)] bg-white px-5 py-3 text-sm font-semibold text-[#233044] transition hover:-translate-y-0.5 hover:bg-[#f3f7fb] disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
+          onClick={() => void handleHumanizeDraft()}
+          disabled={loading || !canGenerate || hasHumanizedDraft}
+        >
+          {isHumanizing
+            ? "正在去 AI 味..."
+            : hasHumanizedDraft
+            ? "已生成去 AI 版"
+            : canGenerate
+              ? "去 AI 味，消耗 1 积分"
+              : "积分不足"}
+        </button>
+        <button
+          type="button"
+          className="rounded-full bg-[#233044] px-5 py-3 text-sm font-semibold text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:bg-stone-300"
+          onClick={() => void handleGenerateMeta()}
+          disabled={loading || !canGenerate}
+        >
+          {loading
+            ? "正在处理..."
+            : canGenerate
+              ? "生成标题和摘要"
+              : "积分不足"}
+        </button>
+      </div>
     </section>
   );
 }

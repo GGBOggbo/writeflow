@@ -502,12 +502,12 @@ describe("AppClient", () => {
     ).not.toHaveLength(0);
   });
 
-  it("keeps the generated draft and shows a notice when humanization degrades", async () => {
+  it("keeps the original draft when the separate humanization action fails", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       "ai-writing-mvp-workflow",
       JSON.stringify({
-        currentStep: "outline_review",
+        currentStep: "draft_review",
         ideaInput: "AI 写作工作流",
         topicOptions: [
           {
@@ -551,8 +551,14 @@ describe("AppClient", () => {
             placement: "正文核心案例",
           },
         ],
-        draftVersions: [],
-        selectedDraftVersionId: null,
+        draftVersions: [
+          {
+            id: "draft-1",
+            label: "原始版",
+            content: "这是安全保留下来的原始正文。",
+          },
+        ],
+        selectedDraftVersionId: "draft-1",
         titleOptions: [],
         summaryOptions: [],
         coverSuggestion: "",
@@ -574,14 +580,95 @@ describe("AppClient", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          drafts: [
-            {
-              id: "draft-1",
-              label: "主稿",
-              content: "这是安全保留下来的原始正文。",
-            },
-          ],
-          humanizationStatus: "degraded",
+          error: "humanizer unavailable",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+    );
+
+    render(<AppClient />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "去 AI 味，消耗 1 积分" })
+    );
+
+    expect(
+      await screen.findByText("这是安全保留下来的原始正文。")
+    ).toBeInTheDocument();
+    expect(
+      await screen.findAllByText("humanizer unavailable")
+    ).not.toHaveLength(0);
+  });
+
+  it("lets the user humanize a delivered draft as a separate paid action", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "ai-writing-mvp-workflow",
+      JSON.stringify({
+        currentStep: "draft_review",
+        ideaInput: "AI 写作工作流",
+        topicOptions: [
+          {
+            id: "topic-1",
+            title: "先跑通主流程",
+            label: "工程推进",
+            angle: "从执行顺序切入",
+            summary: "讲清工程顺序",
+            coreViewpoint: "先验证，再优化。",
+            targetAudience: "产品经理",
+            reason: "这个方向可落地。",
+          },
+        ],
+        selectedTopicId: "topic-1",
+        brief: {
+          objective: "讲清工程顺序",
+          audience: "产品经理",
+          persona: "实战派负责人",
+          tone: "务实",
+          dropOffPoint: "让读者先行动",
+          constraints: ["避免空话"],
+        },
+        structureType: "痛点拆解型",
+        outline: [
+          {
+            id: "section-1",
+            heading: "为什么先验证",
+            corePoint: "先验证主流程",
+            supportSuggestion: "补一个真实片段",
+            sectionRole: "正文模块",
+          },
+        ],
+        materialSlots: [
+          {
+            id: "slot-1",
+            targetOutlineId: "section-1",
+            label: "案例证据",
+            content: "补一个真实片段",
+            purpose: "增强真实感",
+          },
+        ],
+        draftVersions: [
+          {
+            id: "draft-1",
+            label: "原始版",
+            content: "直接生成的原始正文。",
+          },
+        ],
+        selectedDraftVersionId: "draft-1",
+      })
+    );
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          draft: {
+            id: "draft-1-humanized",
+            label: "去 AI 版",
+            content: "这是去掉 AI 味后的正文。",
+          },
         }),
         {
           status: 200,
@@ -592,17 +679,15 @@ describe("AppClient", () => {
 
     render(<AppClient />);
 
-    const generateButton = await screen.findByRole("button", {
-      name: "生成正文版本",
-    });
-    await user.click(generateButton);
+    await user.click(
+      await screen.findByRole("button", { name: "去 AI 味，消耗 1 积分" })
+    );
 
-    expect(
-      await screen.findByText("这是安全保留下来的原始正文。")
-    ).toBeInTheDocument();
-    expect(
-      await screen.findAllByText("去 AI 润色暂未完成，本次已保留原始正文。")
-    ).not.toHaveLength(0);
+    const requestBody = JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body));
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe("/api/ai/humanize/stream");
+    expect(requestBody.draft.content).toBe("直接生成的原始正文。");
+    expect(await screen.findByText("去 AI 版")).toBeInTheDocument();
+    expect(await screen.findByText("这是去掉 AI 味后的正文。")).toBeInTheDocument();
   });
 
   it("asks for confirmation before resetting the workflow", async () => {

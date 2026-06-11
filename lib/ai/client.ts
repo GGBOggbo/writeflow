@@ -3,6 +3,8 @@ import type {
   GenerateBriefOutput,
   GenerateDraftInput,
   GenerateDraftOutput,
+  HumanizeDraftInput,
+  HumanizeDraftOutput,
   GenerateOutlineInput,
   GenerateOutlineOutput,
   GenerateTitlesAndSummariesInput,
@@ -15,6 +17,7 @@ import type { CreditBalance } from "@/types/credits";
 import {
   briefResponseSchema,
   draftResponseSchema,
+  humanizeDraftResponseSchema,
   metaResponseSchema,
   outlineResponseSchema,
   topicResponseSchema,
@@ -144,6 +147,20 @@ export function generateDraft(
     "/api/ai/draft/stream",
     input,
     (data) => draftResponseSchema.parse(data),
+    onProgress,
+    onCredits
+  );
+}
+
+export function humanizeDraft(
+  input: MeteredInput<HumanizeDraftInput>,
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onCredits?: (balance: CreditBalance) => void
+): Promise<HumanizeDraftOutput> {
+  return postJsonStream(
+    "/api/ai/humanize/stream",
+    input,
+    (data) => humanizeDraftResponseSchema.parse(data),
     onProgress,
     onCredits
   );

@@ -47,6 +47,19 @@ describe("GenerationPulse", () => {
     expect(screen.getByText("AI 总结对标文")).toBeInTheDocument();
     expect(screen.getByText("吸收评论卡点")).toBeInTheDocument();
     expect(screen.getByText("生成正文初稿")).toBeInTheDocument();
+    expect(screen.queryByText("去掉机器腔")).not.toBeInTheDocument();
+  });
+
+  it("shows a dedicated timeline for the paid humanization action", () => {
+    render(
+      <GenerationPulse
+        loading
+        action="humanize_draft"
+        message="正在去掉正文里的机器腔..."
+      />
+    );
+
+    expect(screen.getByText("检查机器痕迹")).toBeInTheDocument();
     expect(screen.getByText("去掉机器腔")).toBeInTheDocument();
   });
 

@@ -4,6 +4,7 @@ import { topicRequestSchema } from "@/lib/ai/schemas";
 import { streamJsonResponse } from "./_stream";
 import { POST as postTopics } from "./topics/route";
 import { POST as postTopicsStream } from "./topics/stream/route";
+import { POST as postHumanize } from "./humanize/route";
 
 const creditMocks = vi.hoisted(() => ({
   reserve: vi.fn(),
@@ -108,6 +109,36 @@ describe("AI routes", () => {
     expect(creditMocks.reserve).toHaveBeenCalledWith(
       "test-user",
       "topics",
+      operationId
+    );
+    expect(creditMocks.consume).toHaveBeenCalledWith(
+      "test-user",
+      operationId
+    );
+  });
+
+  it("charges a separate humanize credit after draft delivery", async () => {
+    const request = new Request("http://localhost:3000/api/ai/humanize", {
+      method: "POST",
+      body: JSON.stringify({
+        operationId,
+        draft: { id: "draft-1", label: "原始版", content: "原始正文。" },
+        coreViewpoint: "先验证再优化。",
+        briefPersona: "实战派负责人",
+        briefTone: "务实",
+        briefDropOffPoint: "让读者先行动。",
+      }),
+      headers: { "content-type": "application/json" },
+    });
+
+    const response = await postHumanize(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.draft.label).toBe("去 AI 版");
+    expect(creditMocks.reserve).toHaveBeenCalledWith(
+      "test-user",
+      "humanize",
       operationId
     );
     expect(creditMocks.consume).toHaveBeenCalledWith(

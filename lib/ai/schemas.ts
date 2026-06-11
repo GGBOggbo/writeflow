@@ -267,7 +267,19 @@ export const draftRequestSchema = z.object({
 export const draftResponseSchema = z.object({
   drafts: z.array(draftVersionSchema).min(1),
   searchContext: searchReferenceBundleSchema.optional(),
-  humanizationStatus: z.enum(["success", "degraded"]).optional(),
+});
+
+export const humanizeDraftRequestSchema = z.object({
+  operationId: operationIdSchema,
+  draft: draftVersionSchema,
+  coreViewpoint: z.string().trim().min(1),
+  briefPersona: z.string().trim().min(1),
+  briefTone: z.string().trim().min(1),
+  briefDropOffPoint: z.string().trim().min(1),
+});
+
+export const humanizeDraftResponseSchema = z.object({
+  draft: draftVersionSchema,
 });
 
 export const humanizedDraftResponseSchema = z.object({
