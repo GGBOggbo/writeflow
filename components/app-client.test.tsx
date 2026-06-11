@@ -57,9 +57,9 @@ describe("AppClient", () => {
     await user.type(screen.getByLabelText(/核心想法/i), "AI 写作工作流");
     await user.click(screen.getByRole("button", { name: /生成选题方向/i }));
 
-    expect(await screen.findByText("生成导演台")).toBeInTheDocument();
-    expect(screen.getByText("微信搜一搜")).toBeInTheDocument();
-    expect(screen.getByText("5 篇互动验证")).toBeInTheDocument();
+    expect(await screen.findByText("主编正在判断")).toBeInTheDocument();
+    expect(screen.getByText("看清同类内容")).toBeInTheDocument();
+    expect(screen.getByText("寻找真实信号")).toBeInTheDocument();
 
     resolveRequest(
       new Response(
@@ -451,6 +451,18 @@ describe("AppClient", () => {
 
     expect(await screen.findByText(/重试后的选题/i)).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    const firstBody = JSON.parse(
+      String(fetchSpy.mock.calls[0]?.[1]?.body)
+    ) as { operationId: string };
+    const retryBody = JSON.parse(
+      String(fetchSpy.mock.calls[1]?.[1]?.body)
+    ) as { operationId: string };
+
+    expect(firstBody.operationId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
+    expect(retryBody.operationId).toBe(firstBody.operationId);
   });
 
   it("shows a non-blocking degraded-search message while still rendering topic results", async () => {
@@ -487,6 +499,109 @@ describe("AppClient", () => {
     expect(await screen.findByText(/选题会：选出最值得展开的切口/i)).toBeInTheDocument();
     expect(
       await screen.findAllByText(/联网增强暂不可用，本次生成已自动降级为基础模式。/i)
+    ).not.toHaveLength(0);
+  });
+
+  it("keeps the generated draft and shows a notice when humanization degrades", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "ai-writing-mvp-workflow",
+      JSON.stringify({
+        currentStep: "outline_review",
+        ideaInput: "AI 写作工作流",
+        topicOptions: [
+          {
+            id: "topic-1",
+            title: "先跑通主流程",
+            label: "工程推进",
+            angle: "从执行顺序切入",
+            summary: "讲清工程顺序",
+            coreViewpoint: "先验证，再优化。",
+            targetAudience: "产品经理",
+            reason: "这个方向可落地。",
+          },
+        ],
+        selectedTopicId: "topic-1",
+        brief: {
+          objective: "讲清工程顺序",
+          audience: "产品经理",
+          persona: "实战派负责人",
+          tone: "务实",
+          dropOffPoint: "让读者先行动",
+          constraints: ["避免空话"],
+        },
+        structureType: "痛点拆解型",
+        outline: [
+          {
+            id: "section-1",
+            heading: "为什么先验证",
+            corePoint: "先验证主流程",
+            supportSuggestion: "补一个真实片段",
+            sectionRole: "正文模块",
+            notes: "讲清工程顺序",
+          },
+        ],
+        materialSlots: [
+          {
+            id: "slot-1",
+            targetOutlineId: "section-1",
+            label: "案例证据",
+            content: "补一个真实片段",
+            purpose: "增强真实感",
+            placement: "正文核心案例",
+          },
+        ],
+        draftVersions: [],
+        selectedDraftVersionId: null,
+        titleOptions: [],
+        summaryOptions: [],
+        coverSuggestion: "",
+        finalSelection: {
+          draftVersionId: null,
+          titleId: null,
+          summaryId: null,
+        },
+        searchSettings: {
+          topics: false,
+          brief: false,
+          outline: false,
+          meta: false,
+        },
+        topicSearchContext: null,
+      })
+    );
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          drafts: [
+            {
+              id: "draft-1",
+              label: "主稿",
+              content: "这是安全保留下来的原始正文。",
+            },
+          ],
+          humanizationStatus: "degraded",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+    );
+
+    render(<AppClient />);
+
+    const generateButton = await screen.findByRole("button", {
+      name: "生成正文版本",
+    });
+    await user.click(generateButton);
+
+    expect(
+      await screen.findByText("这是安全保留下来的原始正文。")
+    ).toBeInTheDocument();
+    expect(
+      await screen.findAllByText("去 AI 润色暂未完成，本次已保留原始正文。")
     ).not.toHaveLength(0);
   });
 

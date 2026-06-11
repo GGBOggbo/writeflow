@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useWorkflowContext } from "./workflow-context";
 import { ChatPanel } from "./chat-panel";
 import { ManuscriptPanel } from "./manuscript-panel";
 import { WorkflowStatus } from "./workflow-status";
 import { getSelectedTopic } from "./hooks/use-workflow";
+import { authClient } from "@/lib/auth-client";
 
 const stepSummaries = {
   idea_input: "先把要写的命题说清楚，再让系统帮你收敛方向。",
@@ -17,13 +20,29 @@ const stepSummaries = {
 } as const;
 
 export function WorkspaceShell() {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
   const {
     state,
+    creditBalance,
     resetPending,
     handleRequestResetWorkflow,
     handleCancelResetWorkflow,
     handleConfirmResetWorkflow,
   } = useWorkflowContext();
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push("/login");
+          router.refresh();
+        },
+      },
+    });
+    setSigningOut(false);
+  };
   const selectedTopic = getSelectedTopic(state);
   const heroTitle =
     selectedTopic?.label ??
@@ -38,6 +57,13 @@ export function WorkspaceShell() {
   const enabledSearchStages = [
     state.searchSettings.topics ? "选题联网搜索" : null,
   ].filter(Boolean);
+  const hasNoCredits =
+    creditBalance !== null &&
+    !creditBalance.unlimited &&
+    creditBalance.remaining === 0;
+  const creditValue = creditBalance?.unlimited
+    ? "∞"
+    : creditBalance?.remaining ?? "—";
   const statusChips = [
     `主题：${selectedTopic?.title ?? "等待选题收敛"}`,
     enabledSearchStages.length > 0
@@ -72,7 +98,42 @@ export function WorkspaceShell() {
                   {stepSummaries[state.currentStep]}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap items-stretch gap-3 sm:w-auto sm:justify-end">
+                <div
+                  aria-label={
+                    hasNoCredits
+                      ? "积分不足"
+                      : creditBalance?.unlimited
+                        ? "无限积分"
+                        : `剩余 ${creditValue} 积分`
+                  }
+                  className={[
+                    "min-w-[184px] rounded-[24px] border px-5 py-4 shadow-sm",
+                    hasNoCredits
+                      ? "border-[rgba(156,42,37,0.2)] bg-[#fdecea] text-[#8d2925]"
+                      : "border-[rgba(190,112,65,0.2)] bg-[linear-gradient(135deg,#fff5e8,#fbe2cb)] text-[#7c3f1f]",
+                  ].join(" ")}
+                >
+                  <div className="flex items-end justify-between gap-5">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-75">
+                        剩余积分
+                      </p>
+                      <p className="mt-1 text-4xl font-semibold leading-none tracking-[-0.05em]">
+                        {creditValue}
+                      </p>
+                    </div>
+                    <span className="mb-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">
+                      {hasNoCredits ? "积分不足" : "可用"}
+                    </span>
+                  </div>
+                  <p className="mt-3 border-t border-current/10 pt-2 text-xs opacity-75">
+                    {creditBalance?.unlimited
+                      ? "管理员生成不消耗积分"
+                      : "每次生成消耗 1 积分"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap content-start gap-2 sm:max-w-[210px]">
                 {resetPending ? (
                   <>
                     <button
@@ -91,14 +152,25 @@ export function WorkspaceShell() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    className="inline-flex rounded-full border border-[rgba(35,48,68,0.18)] bg-[#233044] px-4 py-2 text-sm font-medium text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432]"
-                    onClick={handleRequestResetWorkflow}
-                  >
-                    开启新稿
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="inline-flex rounded-full border border-[rgba(35,48,68,0.18)] bg-[#233044] px-4 py-2 text-sm font-medium text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432]"
+                      onClick={handleRequestResetWorkflow}
+                    >
+                      开启新稿
+                    </button>
+                    <button
+                      type="button"
+                      disabled={signingOut}
+                      onClick={handleSignOut}
+                      className="inline-flex rounded-full border border-[rgba(35,48,68,0.10)] bg-white/60 px-3 py-2 text-sm font-medium text-stone-500 transition hover:-translate-y-0.5 hover:bg-white hover:text-stone-700 disabled:opacity-50"
+                    >
+                      {signingOut ? "退出中…" : "登出"}
+                    </button>
+                  </>
                 )}
+                </div>
               </div>
             </div>
             <div className="mt-5 flex flex-wrap gap-2.5">

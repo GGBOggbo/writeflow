@@ -14,7 +14,8 @@ export function getProviderName(): AIProviderName {
     rawName === "mock" ||
     rawName === "openai" ||
     rawName === "anthropic" ||
-    rawName === "mimo"
+    rawName === "mimo" ||
+    rawName === "deepseek"
   ) {
     return rawName;
   }
@@ -41,6 +42,15 @@ export function getRealProviderConfig(
     };
   }
 
+  if (name === "deepseek") {
+    return {
+      name,
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      model: process.env.DEEPSEEK_MODEL,
+      baseUrl: process.env.DEEPSEEK_BASE_URL,
+    };
+  }
+
   return {
     name: "mimo",
     apiKey: process.env.MIMO_API_KEY,
@@ -59,7 +69,9 @@ export function assertProviderKey(config: RealProviderConfig) {
       ? "OPENAI_API_KEY"
       : config.name === "anthropic"
         ? "ANTHROPIC_API_KEY"
-        : "MIMO_API_KEY";
+        : config.name === "deepseek"
+          ? "DEEPSEEK_API_KEY"
+          : "MIMO_API_KEY";
 
   throw new Error(`${keyName} 未配置，无法使用 ${config.name} provider。`);
 }

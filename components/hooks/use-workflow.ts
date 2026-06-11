@@ -27,6 +27,7 @@ import type {
   WorkflowState,
 } from "@/types/workflow";
 import type { WorkflowProgressEvent } from "@/lib/progress/types";
+import type { CreditBalance } from "@/types/credits";
 
 type WorkflowAction =
   | "generate_topics"
@@ -39,6 +40,11 @@ type RequestStatus = {
   action: WorkflowAction;
   message: string;
   events: WorkflowProgressEvent[];
+};
+
+type FailedRequest = {
+  action: WorkflowAction;
+  operationId: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -54,22 +60,32 @@ function canReuseTopicSearchContext(state: WorkflowState) {
   return state.topicSearchContext?.status === "success";
 }
 
+function createOperationId() {
+  return globalThis.crypto.randomUUID();
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useWorkflow() {
+export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
   const [state, setState] = useState<WorkflowState>(createInitialWorkflowState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState("复制最终稿");
   const [copyFailed, setCopyFailed] = useState(false);
-  const [requestStatus, setRequestStatus] = useState<RequestStatus | null>(null);
-  const [lastFailedAction, setLastFailedAction] = useState<WorkflowAction | null>(
-    null
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(
+    initialCreditBalance
   );
+  const [requestStatus, setRequestStatus] = useState<RequestStatus | null>(null);
+  const [lastFailedRequest, setLastFailedRequest] =
+    useState<FailedRequest | null>(null);
   const [resetPending, setResetPending] = useState(false);
   const activeRequestIdRef = useRef(0);
+  const canGenerate =
+    creditBalance === null ||
+    creditBalance.unlimited ||
+    creditBalance.remaining > 0;
 
   // -- localStorage persistence --
 
@@ -92,7 +108,7 @@ export function useWorkflow() {
   const updateState = (nextState: WorkflowState) => {
     setState(nextState);
     setError(null);
-    setLastFailedAction(null);
+    setLastFailedRequest(null);
     setResetPending(false);
   };
 
@@ -101,7 +117,7 @@ export function useWorkflow() {
     activeRequestIdRef.current = requestId;
     setLoading(true);
     setRequestStatus({ action, message, events: [] });
-    setLastFailedAction(null);
+    setLastFailedRequest(null);
     setResetPending(false);
     return requestId;
   };
@@ -150,12 +166,13 @@ export function useWorkflow() {
   const failRequest = (
     requestId: number,
     action: WorkflowAction,
+    operationId: string,
     err: unknown,
     fallbackMessage: string
   ) => {
     if (isActiveRequest(requestId)) {
       setError(getErrorMessage(err, fallbackMessage));
-      setLastFailedAction(action);
+      setLastFailedRequest({ action, operationId });
     }
   };
 
@@ -170,8 +187,9 @@ export function useWorkflow() {
     );
   };
 
-  const handleGenerateTopics = async () => {
+  const handleGenerateTopics = async (retryOperationId?: string) => {
     const action = "generate_topics";
+    const operationId = retryOperationId ?? createOperationId();
     const requestId = startRequest(
       action,
       state.searchSettings.topics
@@ -182,10 +200,11 @@ export function useWorkflow() {
     try {
       setError(null);
       const result = await generateTopics({
+        operationId,
         idea: state.ideaInput,
         searchEnabled: state.searchSettings.topics,
         searchMode: "default",
-      }, recordProgress(requestId));
+      }, recordProgress(requestId), setCreditBalance);
       if (!isActiveRequest(requestId)) {
         return;
       }
@@ -201,13 +220,16 @@ export function useWorkflow() {
         setError(notice);
       }
     } catch (err) {
-      failRequest(requestId, action, err, "生成选题失败。");
+      failRequest(requestId, action, operationId, err, "生成选题失败。");
     } finally {
       finishRequest(requestId);
     }
   };
 
-  const handleSelectTopic = async (topicId: string) => {
+  const handleSelectTopic = async (
+    topicId: string,
+    retryOperationId?: string
+  ) => {
     const selectedTopic = state.topicOptions.find((topic) => topic.id === topicId);
 
     if (!selectedTopic) {
@@ -216,6 +238,7 @@ export function useWorkflow() {
     }
 
     const action = "select_topic";
+    const operationId = retryOperationId ?? createOperationId();
     const canUseSearchContext = canReuseTopicSearchContext(state);
     const requestId = startRequest(
       action,
@@ -233,6 +256,7 @@ export function useWorkflow() {
       setState(selectedState);
       setError(null);
       const result = await generateBrief({
+        operationId,
         topicId,
         topicLabel: selectedTopic.label,
         topicAngle: selectedTopic.angle,
@@ -243,7 +267,7 @@ export function useWorkflow() {
         searchEnabled: canUseSearchContext,
         searchMode: "default",
         searchContext: state.topicSearchContext,
-      }, recordProgress(requestId));
+      }, recordProgress(requestId), setCreditBalance);
       if (!isActiveRequest(requestId)) {
         return;
       }
@@ -258,7 +282,7 @@ export function useWorkflow() {
         setError(notice);
       }
     } catch (err) {
-      failRequest(requestId, action, err, "生成 Brief 失败。");
+      failRequest(requestId, action, operationId, err, "生成 Brief 失败。");
     } finally {
       finishRequest(requestId);
     }
@@ -282,7 +306,7 @@ export function useWorkflow() {
     );
   };
 
-  const handleConfirmBrief = async () => {
+  const handleConfirmBrief = async (retryOperationId?: string) => {
     if (!state.selectedTopicId || !state.brief) {
       return;
     }
@@ -295,6 +319,7 @@ export function useWorkflow() {
     }
 
     const action = "confirm_brief";
+    const operationId = retryOperationId ?? createOperationId();
     const canUseSearchContext = canReuseTopicSearchContext(state);
     const requestId = startRequest(
       action,
@@ -306,6 +331,7 @@ export function useWorkflow() {
     try {
       setError(null);
       const result = await generateOutline({
+        operationId,
         topicId: state.selectedTopicId,
         topicLabel: selectedTopic.label,
         topicAngle: selectedTopic.angle,
@@ -322,7 +348,7 @@ export function useWorkflow() {
         searchEnabled: canUseSearchContext,
         searchMode: "default",
         searchContext: state.topicSearchContext,
-      }, recordProgress(requestId));
+      }, recordProgress(requestId), setCreditBalance);
       if (!isActiveRequest(requestId)) {
         return;
       }
@@ -338,13 +364,13 @@ export function useWorkflow() {
         setError(notice);
       }
     } catch (err) {
-      failRequest(requestId, action, err, "生成大纲失败。");
+      failRequest(requestId, action, operationId, err, "生成大纲失败。");
     } finally {
       finishRequest(requestId);
     }
   };
 
-  const handleGenerateDrafts = async () => {
+  const handleGenerateDrafts = async (retryOperationId?: string) => {
     if (!state.selectedTopicId || !state.brief || state.outline.length === 0) {
       return;
     }
@@ -357,6 +383,7 @@ export function useWorkflow() {
     }
 
     const action = "generate_drafts";
+    const operationId = retryOperationId ?? createOperationId();
     const canUseSearchContext = canReuseTopicSearchContext(state);
     const requestId = startRequest(
       action,
@@ -368,6 +395,7 @@ export function useWorkflow() {
     try {
       setError(null);
       const result = await generateDraft({
+        operationId,
         topicId: state.selectedTopicId,
         topicLabel: selectedTopic.label,
         topicAngle: selectedTopic.angle,
@@ -386,7 +414,7 @@ export function useWorkflow() {
         searchEnabled: canUseSearchContext,
         searchMode: "default",
         searchContext: state.topicSearchContext,
-      }, recordProgress(requestId));
+      }, recordProgress(requestId), setCreditBalance);
       if (!isActiveRequest(requestId)) {
         return;
       }
@@ -397,8 +425,17 @@ export function useWorkflow() {
           searchContext: result.searchContext,
         })
       );
+      if (result.humanizationStatus === "degraded") {
+        setError("去 AI 润色暂未完成，本次已保留原始正文。");
+      }
     } catch (err) {
-      failRequest(requestId, action, err, "生成正文版本失败。");
+      failRequest(
+        requestId,
+        action,
+        operationId,
+        err,
+        "生成正文版本失败。"
+      );
     } finally {
       finishRequest(requestId);
     }
@@ -411,7 +448,7 @@ export function useWorkflow() {
     });
   };
 
-  const handleGenerateMeta = async () => {
+  const handleGenerateMeta = async (retryOperationId?: string) => {
     if (!state.selectedTopicId || !state.selectedDraftVersionId || !state.brief) {
       return;
     }
@@ -427,6 +464,7 @@ export function useWorkflow() {
     }
 
     const action = "generate_meta";
+    const operationId = retryOperationId ?? createOperationId();
     const canUseSearchContext = canReuseTopicSearchContext(state);
     const requestId = startRequest(
       action,
@@ -438,6 +476,7 @@ export function useWorkflow() {
     try {
       setError(null);
       const result = await generateTitlesAndSummaries({
+        operationId,
         topicLabel: selectedTopic.label,
         coreViewpoint: selectedTopic.coreViewpoint,
         topicAngle: selectedTopic.angle,
@@ -450,7 +489,7 @@ export function useWorkflow() {
         searchEnabled: canUseSearchContext,
         searchMode: "default",
         searchContext: state.topicSearchContext,
-      }, recordProgress(requestId));
+      }, recordProgress(requestId), setCreditBalance);
       if (!isActiveRequest(requestId)) {
         return;
       }
@@ -467,7 +506,13 @@ export function useWorkflow() {
         setError(notice);
       }
     } catch (err) {
-      failRequest(requestId, action, err, "生成标题和摘要失败。");
+      failRequest(
+        requestId,
+        action,
+        operationId,
+        err,
+        "生成标题和摘要失败。"
+      );
     } finally {
       finishRequest(requestId);
     }
@@ -582,35 +627,35 @@ export function useWorkflow() {
   };
 
   const handleRetryLastAction = () => {
-    if (!lastFailedAction || loading) {
+    if (!lastFailedRequest || loading) {
       return;
     }
 
-    const action = lastFailedAction;
-    setLastFailedAction(null);
+    const { action, operationId } = lastFailedRequest;
+    setLastFailedRequest(null);
 
     if (action === "generate_topics") {
-      void handleGenerateTopics();
+      void handleGenerateTopics(operationId);
       return;
     }
 
     if (action === "select_topic" && state.selectedTopicId) {
-      void handleSelectTopic(state.selectedTopicId);
+      void handleSelectTopic(state.selectedTopicId, operationId);
       return;
     }
 
     if (action === "confirm_brief") {
-      void handleConfirmBrief();
+      void handleConfirmBrief(operationId);
       return;
     }
 
     if (action === "generate_drafts") {
-      void handleGenerateDrafts();
+      void handleGenerateDrafts(operationId);
       return;
     }
 
     if (action === "generate_meta") {
-      void handleGenerateMeta();
+      void handleGenerateMeta(operationId);
     }
   };
 
@@ -627,7 +672,7 @@ export function useWorkflow() {
     clearWorkflowState();
     setState(createInitialWorkflowState());
     setError(null);
-    setLastFailedAction(null);
+    setLastFailedRequest(null);
     setRequestStatus(null);
     setResetPending(false);
     setCopyLabel("复制最终稿");
@@ -636,10 +681,12 @@ export function useWorkflow() {
 
   return {
     state,
+    creditBalance,
+    canGenerate,
     loading,
     error,
     requestStatus,
-    canRetryLastAction: lastFailedAction !== null,
+    canRetryLastAction: lastFailedRequest !== null,
     resetPending,
     copyLabel,
     copyFailed,

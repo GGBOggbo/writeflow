@@ -297,8 +297,8 @@ export function searchForTopics(
   const query = buildTopicsSearchQuery(idea);
   onProgress?.({
     stepId: "search_query_built",
-    label: "提炼搜索词",
-    detail: query,
+    label: "拆解命题",
+    detail: "捕捉话题信号",
   });
   return safeSearch(query, "topics", mode, onProgress);
 }

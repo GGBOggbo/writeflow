@@ -10,8 +10,11 @@ import {
 } from "./schemas";
 
 describe("AI schemas", () => {
+  const operationId = "11111111-1111-4111-8111-111111111111";
+
   it("accepts a valid topic generation request", () => {
     const result = topicRequestSchema.safeParse({
+      operationId,
       idea: "公众号 AI 写作流程",
     });
 
@@ -20,6 +23,7 @@ describe("AI schemas", () => {
 
   it("requires structureType in a valid outline generation request", () => {
     const result = outlineRequestSchema.safeParse({
+      operationId,
       topicId: "topic-1",
       topicLabel: "产品结构视角",
       topicAngle: "从产品结构切入",
@@ -40,6 +44,7 @@ describe("AI schemas", () => {
 
   it("requires structureType in a valid brief generation request", () => {
     const result = briefRequestSchema.safeParse({
+      operationId,
       topicId: "topic-1",
       topicLabel: "产品结构视角",
       topicAngle: "从产品结构切入",
@@ -50,6 +55,15 @@ describe("AI schemas", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("requires a UUID operation id for metered requests", () => {
+    expect(
+      topicRequestSchema.safeParse({
+        operationId: "not-a-uuid",
+        idea: "公众号 AI 写作流程",
+      }).success
+    ).toBe(false);
   });
 
   it("normalizes topic responses into the new structured topic fields", () => {

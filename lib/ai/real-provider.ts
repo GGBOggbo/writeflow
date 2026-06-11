@@ -1,6 +1,7 @@
 import {
   briefResponseSchema,
   draftResponseSchema,
+  humanizedDraftResponseSchema,
   metaResponseSchema,
   outlineResponseSchema,
   topicResponseSchema,
@@ -9,6 +10,7 @@ import {
 import { log } from "@/lib/debug";
 import { buildBriefPrompt } from "./prompts/brief";
 import { buildDraftPrompt } from "./prompts/draft";
+import { buildHumanizeDraftPrompt } from "./prompts/humanize-draft";
 import { buildMetaPrompt } from "./prompts/meta";
 import { buildOutlinePrompt } from "./prompts/outline";
 import { buildTopicsPrompt } from "./prompts/topics";
@@ -25,8 +27,8 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
   const config = getRealProviderConfig(name);
   assertProviderKey(config);
 
-  if (config.name !== "mimo") {
-    // Only mimo is fully implemented; return a provider that throws on every call.
+  if (config.name !== "mimo" && config.name !== "deepseek") {
+    // Only mimo and deepseek are fully implemented; return a provider that throws on every call.
     return {
       async generateTopics() {
         assertProviderKey(config);
@@ -48,6 +50,10 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
         assertProviderKey(config);
         throw notImplemented(config.name, "draft");
       },
+      async humanizeDrafts() {
+        assertProviderKey(config);
+        throw notImplemented(config.name, "draft humanization");
+      },
       async generateTitlesAndSummaries() {
         assertProviderKey(config);
         throw notImplemented(config.name, "meta");
@@ -55,75 +61,99 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
     };
   }
 
+  // DeepSeek uses the same OpenAI-compatible API as Mimo.
+  const defaultModel =
+    config.name === "deepseek" ? "deepseek-v4-flash" : "mimo-v2.5-pro";
+  const defaultBaseUrl =
+    config.name === "deepseek"
+      ? "https://api.deepseek.com/v1"
+      : "https://token-plan-cn.xiaomimimo.com/v1";
+  const providerLabel = config.name;
+
+  const defaults = { model: defaultModel, baseUrl: defaultBaseUrl, label: providerLabel };
+
   return {
     summarizeBenchmarks: (results) =>
-      callMimo(results, config, {
+      callMimo(results, config, defaults, {
         buildPrompt: buildBenchmarkSummaryPrompt,
         jsonHint:
           '{"summaries":[{"url":"string","userPain":"string","structurePattern":"string","rhythmNotes":"string","commentInsights":["string"],"reusableAngles":["string"],"avoidCopying":["string"]}]}',
         maxTokens: 1600,
         temperature: 0.25,
         schema: benchmarkSummaryResponseSchema,
-        label: "mimo benchmark summary",
+        label: `${providerLabel} benchmark summary`,
         retries: 2,
       }),
 
     generateTopics: (input) =>
-      callMimo(input, config, {
+      callMimo(input, config, defaults, {
         buildPrompt: buildTopicsPrompt,
         jsonHint:
           '{"topics":[{"id":"string","title":"string","label":"string","angle":"string","summary":"string","coreViewpoint":"string","targetAudience":"string","reason":"string"}]}',
         maxTokens: 4096,
         schema: topicResponseSchema,
-        label: "mimo topics",
+        label: `${providerLabel} topics`,
       }),
 
     generateBrief: (input) =>
-      callMimo(input, config, {
+      callMimo(input, config, defaults, {
         buildPrompt: buildBriefPrompt,
         jsonHint:
           '{"brief":{"objective":"string","audience":"string","persona":"string","tone":"string","dropOffPoint":"string","constraints":["string"]}}',
         maxTokens: 1024,
         schema: briefResponseSchema,
-        label: "mimo brief",
+        label: `${providerLabel} brief`,
         retries: 2,
       }),
 
     generateOutline: (input) =>
-      callMimo(input, config, {
+      callMimo(input, config, defaults, {
         buildPrompt: buildOutlinePrompt,
         jsonHint:
           '{"outline":[{"id":"string","heading":"string","corePoint":"string","supportSuggestion":"string","sectionRole":"string"}],"materialSlots":[{"id":"string","targetOutlineId":"string","label":"string","content":"string","purpose":"string"}]}',
         maxTokens: 2200,
         temperature: 0.35,
         schema: outlineResponseSchema,
-        label: "mimo outline",
+        label: `${providerLabel} outline`,
         retries: 3,
         postParse: normalizeOutlinePayload,
       }),
 
     generateDraft: (input) =>
-      callMimo(input, config, {
+      callMimo(input, config, defaults, {
         buildPrompt: buildDraftPrompt,
         jsonHint:
           '{"drafts":[{"id":"string","label":"string","content":"string"}]}',
         maxTokens: 2200,
         temperature: 0.75,
         schema: draftResponseSchema,
-        label: "mimo draft",
+        label: `${providerLabel} draft`,
         retries: 2,
         postParse: normalizeDraftPayload,
       }),
 
+    humanizeDrafts: (input) =>
+      callMimo(input, config, defaults, {
+        buildPrompt: buildHumanizeDraftPrompt,
+        jsonHint:
+          '{"drafts":[{"id":"string","label":"string","content":"string"}]}',
+        maxTokens: 2400,
+        temperature: 0.65,
+        schema: humanizedDraftResponseSchema,
+        label: `${providerLabel} draft humanizer`,
+        retries: 1,
+        postParse: normalizeDraftPayload,
+      }),
+
     generateTitlesAndSummaries: (input) =>
-      callMimo(input, config, {
+      callMimo(input, config, defaults, {
         buildPrompt: buildMetaPrompt,
         jsonHint:
           '{"titles":[{"id":"string","label":"利益结果型","content":"string"},{"id":"string","label":"场景痛点型","content":"string"},{"id":"string","label":"反常识/认知冲突型","content":"string"},{"id":"string","label":"新机会趋势型","content":"string"},{"id":"string","label":"个人故事/实录型","content":"string"}],"summaries":[{"id":"string","label":"痛点共鸣版","content":"string"},{"id":"string","label":"悬念反转版","content":"string"},{"id":"string","label":"专业克制版","content":"string"}],"coverSuggestion":"string"}',
         maxTokens: 1200,
         temperature: 0.75,
         schema: metaResponseSchema,
-        label: "mimo meta",
+        label: `${providerLabel} meta`,
       }),
   };
 }
@@ -147,12 +177,12 @@ type MimoCallSpec<TInput, TOutput> = {
 async function callMimo<TInput, TOutput>(
   input: TInput,
   config: ReturnType<typeof getRealProviderConfig>,
+  defaults: { model: string; baseUrl: string; label: string },
   spec: MimoCallSpec<TInput, TOutput>,
 ): Promise<TOutput> {
   const prompt = spec.buildPrompt(input);
-  const model = config.model?.trim() || "mimo-v2.5-pro";
-  const baseUrl =
-    config.baseUrl?.trim() || "https://token-plan-cn.xiaomimimo.com/v1";
+  const model = config.model?.trim() || defaults.model;
+  const baseUrl = config.baseUrl?.trim() || defaults.baseUrl;
 
   const maxAttempts = spec.retries ?? 1;
   let lastError: unknown;

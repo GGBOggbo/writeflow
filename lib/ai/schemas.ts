@@ -182,7 +182,10 @@ export const metaCardSchema = z.object({
   content: z.string(),
 });
 
+const operationIdSchema = z.string().uuid();
+
 export const topicRequestSchema = z.object({
+  operationId: operationIdSchema,
   idea: z.string().trim().min(1),
   searchEnabled: z.boolean().optional(),
   searchMode: z.enum(["default", "manual"]).optional(),
@@ -195,6 +198,7 @@ export const topicResponseSchema = z.object({
 });
 
 export const briefRequestSchema = z.object({
+  operationId: operationIdSchema,
   topicId: z.string().trim().min(1),
   topicLabel: z.string().trim().min(1),
   topicAngle: z.string().trim().min(1),
@@ -213,6 +217,7 @@ export const briefResponseSchema = z.object({
 });
 
 export const outlineRequestSchema = z.object({
+  operationId: operationIdSchema,
   topicId: z.string().trim().min(1),
   topicLabel: z.string().trim().min(1),
   topicAngle: z.string().trim().min(1),
@@ -238,6 +243,7 @@ export const outlineResponseSchema = z.object({
 });
 
 export const draftRequestSchema = z.object({
+  operationId: operationIdSchema,
   topicId: z.string().trim().min(1),
   topicLabel: z.string().trim().min(1),
   topicAngle: z.string().trim().min(1),
@@ -261,9 +267,15 @@ export const draftRequestSchema = z.object({
 export const draftResponseSchema = z.object({
   drafts: z.array(draftVersionSchema).min(1),
   searchContext: searchReferenceBundleSchema.optional(),
+  humanizationStatus: z.enum(["success", "degraded"]).optional(),
+});
+
+export const humanizedDraftResponseSchema = z.object({
+  drafts: z.array(draftVersionSchema).min(1),
 });
 
 export const metaRequestSchema = z.object({
+  operationId: operationIdSchema,
   topicLabel: z.string().trim().min(1),
   coreViewpoint: z.string().trim().min(1),
   topicAngle: z.string().trim().min(1),

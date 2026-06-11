@@ -3,6 +3,8 @@ import type {
   GenerateBriefOutput,
   GenerateDraftInput,
   GenerateDraftOutput,
+  HumanizeDraftsInput,
+  HumanizeDraftsOutput,
   GenerateOutlineInput,
   GenerateOutlineOutput,
   GenerateTitlesAndSummariesInput,
@@ -17,7 +19,7 @@ export type BenchmarkSummaryOutput = ReturnType<
   typeof benchmarkSummaryResponseSchema.parse
 >;
 
-export type AIProviderName = "mock" | "openai" | "anthropic" | "mimo";
+export type AIProviderName = "mock" | "openai" | "anthropic" | "mimo" | "deepseek";
 export type RealAIProviderName = Exclude<AIProviderName, "mock">;
 
 export interface AIProvider {
@@ -26,6 +28,7 @@ export interface AIProvider {
   generateBrief(input: GenerateBriefInput): Promise<GenerateBriefOutput>;
   generateOutline(input: GenerateOutlineInput): Promise<GenerateOutlineOutput>;
   generateDraft(input: GenerateDraftInput): Promise<GenerateDraftOutput>;
+  humanizeDrafts(input: HumanizeDraftsInput): Promise<HumanizeDraftsOutput>;
   generateTitlesAndSummaries(
     input: GenerateTitlesAndSummariesInput
   ): Promise<GenerateTitlesAndSummariesOutput>;

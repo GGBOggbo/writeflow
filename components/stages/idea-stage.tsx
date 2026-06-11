@@ -7,6 +7,7 @@ export function IdeaStage() {
   const {
     state,
     loading,
+    canGenerate,
     handleIdeaChange,
     handleGenerateTopics,
     handleSetSearchEnabled,
@@ -53,10 +54,10 @@ export function IdeaStage() {
       <button
         type="button"
         className="rounded-full bg-[#233044] px-5 py-3 text-sm font-semibold text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:bg-stone-300"
-        onClick={handleGenerateTopics}
-        disabled={loading || !state.ideaInput.trim()}
+        onClick={() => void handleGenerateTopics()}
+        disabled={loading || !state.ideaInput.trim() || !canGenerate}
       >
-        {loading ? "生成中..." : "生成选题方向"}
+        {loading ? "生成中..." : canGenerate ? "生成选题方向" : "积分不足"}
       </button>
     </section>
   );

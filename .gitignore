@@ -46,6 +46,10 @@ next-env.d.ts
 .codex/
 skills-lock.json
 
+# auth
+data/
+better-auth_migrations/
+
 # working / output directories
 work/
 outputs/

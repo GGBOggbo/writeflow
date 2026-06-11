@@ -3,7 +3,8 @@
 import { useWorkflowContext } from "../workflow-context";
 
 export function OutlineStage() {
-  const { state, loading, handleGenerateDrafts } = useWorkflowContext();
+  const { state, loading, canGenerate, handleGenerateDrafts } =
+    useWorkflowContext();
   const outlineHeadings = new Map(
     state.outline.map((section) => [section.id, section.heading])
   );
@@ -84,10 +85,10 @@ export function OutlineStage() {
       <button
         type="button"
         className="rounded-full bg-[var(--accent-ink)] px-5 py-3 text-sm font-semibold text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:bg-stone-300"
-        onClick={handleGenerateDrafts}
-        disabled={loading}
+        onClick={() => void handleGenerateDrafts()}
+        disabled={loading || !canGenerate}
       >
-        {loading ? "正在生成正文版本..." : "生成正文版本"}
+        {loading ? "正在生成正文版本..." : canGenerate ? "生成正文版本" : "积分不足"}
       </button>
     </section>
   );

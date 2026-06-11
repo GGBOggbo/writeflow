@@ -291,8 +291,8 @@ async function enrichResults(
 
   onProgress?.({
     stepId: "engagement_enrichment_started",
-    label: "5 篇互动验证",
-    detail: `准备验证 ${candidates.length} 篇文章`,
+    label: "甄别热度",
+    detail: "排除刷量水文",
   });
 
   const enriched = await Promise.all(
@@ -307,8 +307,7 @@ async function enrichResults(
 
   onProgress?.({
     stepId: "engagement_enrichment_completed",
-    label: "5 篇互动验证完成",
-    detail: `已验证 ${enriched.length} 篇文章`,
+    label: "甄别热度完成",
   });
 
   let nextResults = [...enriched, ...tail];
@@ -321,8 +320,8 @@ async function enrichResults(
   const deepDiveCandidates = selectDeepDiveArticles(enriched, articleLimit);
   onProgress?.({
     stepId: "deep_dive_started",
-    label: "2 篇深拆",
-    detail: `准备深拆 ${deepDiveCandidates.length} 篇文章`,
+    label: "拆解标杆",
+    detail: "剖析对标文章的结构与共鸣点",
   });
   const withHtml = await Promise.all(
     deepDiveCandidates.map(async (result) => {
@@ -362,8 +361,7 @@ async function enrichResults(
 
   onProgress?.({
     stepId: "deep_dive_completed",
-    label: "2 篇深拆完成",
-    detail: `已完成 ${deepDiveResults.length} 篇核心对标文`,
+    label: "拆解标杆完成",
   });
 
   return nextResults;
@@ -381,8 +379,8 @@ export const jizhilaSearchProvider: SearchProvider = {
     const verifycode = process.env.JIZHILA_VERIFY_CODE?.trim() ?? "";
     onProgress?.({
       stepId: "web_search_started",
-      label: "微信搜一搜",
-      detail: input.query,
+      label: "扫描参考池",
+      detail: "寻找相关文章",
     });
 
     const response = await fetch(`${baseUrl}/fbmain/monitor/v3/web_search`, {
@@ -416,15 +414,14 @@ export const jizhilaSearchProvider: SearchProvider = {
 
     onProgress?.({
       stepId: "web_search_completed",
-      label: "微信搜一搜完成",
-      detail: "已收到公众号文章列表",
+      label: "扫描参考池完成",
     });
 
     const results = parseResults(json).slice(0, 8);
     onProgress?.({
       stepId: "results_normalized",
-      label: "8 篇建档",
-      detail: `保留 ${results.length} 篇参考文章`,
+      label: "筛选素材",
+      detail: `留下 ${results.length} 篇高相关素材`,
     });
 
     return enrichResults(results, baseUrl, apiKey, verifycode, onProgress);

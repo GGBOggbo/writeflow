@@ -654,6 +654,31 @@ describe("AI service", () => {
             headers: { "Content-Type": "application/json" },
           }
         )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "版本 A",
+                        content: "正文吸收了第一步卡点。",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       );
 
     const result = await generateOutline({
@@ -866,6 +891,219 @@ describe("AI service", () => {
     );
   });
 
+  it("runs a dedicated humanizer pass and returns the rewritten draft", async () => {
+    vi.stubEnv("AI_PROVIDER", "mimo");
+    vi.stubEnv("MIMO_API_KEY", "test-key");
+    vi.stubEnv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1");
+    vi.stubEnv("MIMO_MODEL", "mimo-v2.5-pro");
+
+    const placeholder = "【💡需要你补充：补一个真实开发片段】";
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "主稿",
+                        content: `首先，这不仅是流程问题，更是认知升级。${placeholder}`,
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "主稿",
+                        content: `这事没那么玄，先把流程跑通。${placeholder}`,
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+    const result = await generateDraft({
+      topicId: "topic-1",
+      topicLabel: "工程推进视角",
+      topicAngle: "从 MVP 到真实 AI 接入的工程推进",
+      coreViewpoint: "先跑通主流程，再接真实 AI。",
+      targetAudience: "产品经理",
+      reason: "这个切口可复用。",
+      structureType: "痛点拆解型",
+      briefObjective: "讲清工程顺序。",
+      briefAudience: "产品经理",
+      briefPersona: "踩过坑的产品负责人",
+      briefTone: "清晰、务实",
+      briefDropOffPoint: "让读者先验证主流程。",
+      briefConstraints: ["避免空话"],
+      outline: [
+        {
+          id: "section-1",
+          heading: "为什么先跑通主流程",
+          notes: "讲清工程顺序。",
+        },
+      ],
+      materialSlots: [],
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(String(fetchSpy.mock.calls[1]?.[1]?.body)).toContain("终审编辑");
+    expect(String(fetchSpy.mock.calls[1]?.[1]?.body)).toContain("否定式排比");
+    expect(String(fetchSpy.mock.calls[1]?.[1]?.body)).toContain(
+      "不得新增事实、经历、案例、数据"
+    );
+    expect(result.drafts[0]?.content).toBe(
+      `这事没那么玄，先把流程跑通。${placeholder}`
+    );
+    expect(result.humanizationStatus).toBe("success");
+  });
+
+  it("keeps the original draft when the humanizer request fails", async () => {
+    vi.stubEnv("AI_PROVIDER", "mimo");
+    vi.stubEnv("MIMO_API_KEY", "test-key");
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "主稿",
+                        content: "原始正文。",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      .mockRejectedValue(new Error("humanizer unavailable"));
+
+    const result = await generateDraft({
+      topicId: "topic-1",
+      topicLabel: "工程推进",
+      topicAngle: "先跑主流程",
+      coreViewpoint: "先验证再优化。",
+      targetAudience: "产品经理",
+      reason: "可落地。",
+      structureType: "痛点拆解型",
+      briefObjective: "讲清工程顺序。",
+      briefAudience: "产品经理",
+      briefPersona: "实战派负责人",
+      briefTone: "务实",
+      briefDropOffPoint: "先行动。",
+      briefConstraints: ["避免空话"],
+      outline: [{ id: "s1", heading: "先验证", notes: "讲顺序" }],
+      materialSlots: [],
+    });
+
+    expect(result.drafts[0]?.content).toBe("原始正文。");
+    expect(result.humanizationStatus).toBe("degraded");
+  });
+
+  it("rejects a humanized draft that changes a material placeholder", async () => {
+    vi.stubEnv("AI_PROVIDER", "mimo");
+    vi.stubEnv("MIMO_API_KEY", "test-key");
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "主稿",
+                        content: "正文。【💡需要你补充：真实客户案例】",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "主稿",
+                        content: "正文。【💡需要你补充：一个案例】",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+
+    const result = await generateDraft({
+      topicId: "topic-1",
+      topicLabel: "工程推进",
+      topicAngle: "先跑主流程",
+      coreViewpoint: "先验证再优化。",
+      targetAudience: "产品经理",
+      reason: "可落地。",
+      structureType: "痛点拆解型",
+      briefObjective: "讲清工程顺序。",
+      briefAudience: "产品经理",
+      briefPersona: "实战派负责人",
+      briefTone: "务实",
+      briefDropOffPoint: "先行动。",
+      briefConstraints: ["避免空话"],
+      outline: [{ id: "s1", heading: "先验证", notes: "讲顺序" }],
+      materialSlots: [],
+    });
+
+    expect(result.drafts[0]?.content).toContain("真实客户案例");
+    expect(result.humanizationStatus).toBe("degraded");
+  });
+
   it("summarizes deep-dive search benchmarks before requesting a draft from mimo", async () => {
     vi.stubEnv("AI_PROVIDER", "mimo");
     vi.stubEnv("MIMO_API_KEY", "test-key");
@@ -929,6 +1167,31 @@ describe("AI service", () => {
             headers: { "Content-Type": "application/json" },
           }
         )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "版本 A",
+                        content: "正文吸收了第一步卡点。",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       );
 
     const result = await generateDraft({
@@ -978,7 +1241,7 @@ describe("AI service", () => {
       },
     });
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(String(fetchSpy.mock.calls[0]?.[1]?.body)).toContain("对标拆解总结");
     expect(String(fetchSpy.mock.calls[1]?.[1]?.body)).toContain(
       "读者真正卡住的是不知道第一步该做什么。"
@@ -994,25 +1257,56 @@ describe("AI service", () => {
     vi.stubEnv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1");
     vi.stubEnv("MIMO_MODEL", "mimo-v2.5-pro");
 
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content:
-                  '下面是按要求返回的 JSON：\n{"drafts":[{"id":"draft-a","label":"版本 A","content":"先讲清主流程。"},{"id":"draft-b","label":"版本 B","content":"再讲 provider 分层。"}]}\n请查收。',
-                role: "assistant",
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content:
+                    '下面是按要求返回的 JSON：\n{"drafts":[{"id":"draft-a","label":"版本 A","content":"先讲清主流程。"},{"id":"draft-b","label":"版本 B","content":"再讲 provider 分层。"}]}\n请查收。',
+                  role: "assistant",
+                },
               },
-            },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       )
-    );
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "版本 A",
+                        content: "先讲清主流程。",
+                      },
+                      {
+                        id: "draft-b",
+                        label: "版本 B",
+                        content: "再讲 provider 分层。",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
 
     const result = await generateDraft({
       topicId: "topic-1",
@@ -1083,6 +1377,31 @@ describe("AI service", () => {
             headers: { "Content-Type": "application/json" },
           }
         )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    drafts: [
+                      {
+                        id: "draft-a",
+                        label: "版本 A",
+                        content: "先讲清主流程。",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       );
 
     const result = await generateDraft({
@@ -1117,7 +1436,7 @@ describe("AI service", () => {
     });
 
     expect(result.drafts).toHaveLength(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 
   it("normalizes a wrong draft JSON shape without requiring a retry", async () => {
@@ -1153,16 +1472,8 @@ describe("AI service", () => {
             choices: [
               {
                 message: {
-                  content: JSON.stringify({
-                    drafts: [
-                      {
-                        id: "draft-a",
-                        label: "版本 A",
-                        content: "先讲清主流程。",
-                      },
-                    ],
-                  }),
-                  role: "assistant",
+                  content:
+                    '{"drafts":[{"id":"draft_1","label":"深度技术评测风格","content":"这是被截断后残留的单个正文对象。"}]}',
                 },
               },
             ],
@@ -1206,7 +1517,7 @@ describe("AI service", () => {
     });
 
     expect(result.drafts).toHaveLength(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it("normalizes a single draft object into the expected drafts array shape", async () => {

@@ -4,7 +4,7 @@ import { useWorkflowContext } from "../workflow-context";
 import { ProseText } from "../prose-text";
 
 export function DraftStage() {
-  const { state, loading, handleSelectDraft, handleGenerateMeta } =
+  const { state, loading, canGenerate, handleSelectDraft, handleGenerateMeta } =
     useWorkflowContext();
 
   const activeDraft =
@@ -63,10 +63,14 @@ export function DraftStage() {
       <button
         type="button"
         className="rounded-full bg-[#233044] px-5 py-3 text-sm font-semibold text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:bg-stone-300"
-        onClick={handleGenerateMeta}
-        disabled={loading}
+        onClick={() => void handleGenerateMeta()}
+        disabled={loading || !canGenerate}
       >
-        {loading ? "正在生成标题摘要..." : "生成标题和摘要"}
+        {loading
+          ? "正在生成标题摘要..."
+          : canGenerate
+            ? "生成标题和摘要"
+            : "积分不足"}
       </button>
     </section>
   );

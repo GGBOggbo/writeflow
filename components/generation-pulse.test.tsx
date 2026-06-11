@@ -6,17 +6,32 @@ import {
 } from "./generation-pulse";
 
 describe("GenerationPulse", () => {
-  it("maps topic generation to the search and enrichment timeline", () => {
+  it("presents topic generation as four editorial judgments", () => {
     const steps = getGenerationPulseSteps("generate_topics");
 
     expect(steps.map((step) => step.label)).toEqual([
-      "提炼搜索词",
-      "微信搜一搜",
-      "8 篇建档",
-      "5 篇互动验证",
-      "2 篇深拆",
-      "生成选题",
+      "看清同类内容",
+      "寻找真实信号",
+      "拆出有效打法",
+      "策划你的切口",
     ]);
+  });
+
+  it("uses editorial framing while topics are being generated", () => {
+    render(
+      <GenerationPulse
+        loading
+        action="generate_topics"
+        message="正在联网检索并生成选题方向..."
+      />
+    );
+
+    expect(screen.getByText("主编正在判断")).toBeInTheDocument();
+    expect(
+      screen.getByText("先看清外面怎么写，再替你寻找不撞车的切口。")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("微信搜一搜")).not.toBeInTheDocument();
+    expect(screen.queryByText(/篇互动验证/)).not.toBeInTheDocument();
   });
 
   it("shows benchmark summary progress while generating drafts", () => {
@@ -32,6 +47,7 @@ describe("GenerationPulse", () => {
     expect(screen.getByText("AI 总结对标文")).toBeInTheDocument();
     expect(screen.getByText("吸收评论卡点")).toBeInTheDocument();
     expect(screen.getByText("生成正文初稿")).toBeInTheDocument();
+    expect(screen.getByText("去掉机器腔")).toBeInTheDocument();
   });
 
   it("marks steps from real backend progress events instead of guessing progress", () => {
@@ -43,24 +59,21 @@ describe("GenerationPulse", () => {
         events={[
           {
             stepId: "search_query_built",
-            label: "提炼搜索词",
+            label: "拆解命题",
             detail: "AI 副业 痛点",
           },
           {
             stepId: "web_search_started",
-            label: "微信搜一搜",
+            label: "扫描参考池",
           },
         ]}
       />
     );
 
-    expect(screen.getByText("提炼搜索词").closest("li")).toHaveClass(
-      "generation-pulse__step--done"
-    );
-    expect(screen.getByText("微信搜一搜").closest("li")).toHaveClass(
+    expect(screen.getByText("看清同类内容").closest("li")).toHaveClass(
       "generation-pulse__step--active"
     );
-    expect(screen.getByText("8 篇建档").closest("li")).toHaveClass(
+    expect(screen.getByText("寻找真实信号").closest("li")).toHaveClass(
       "generation-pulse__step--waiting"
     );
   });

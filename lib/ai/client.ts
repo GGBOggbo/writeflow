@@ -11,6 +11,7 @@ import type {
   GenerateTopicsOutput,
 } from "@/types/ai";
 import type { WorkflowProgressEvent } from "@/lib/progress/types";
+import type { CreditBalance } from "@/types/credits";
 import {
   briefResponseSchema,
   draftResponseSchema,
@@ -19,11 +20,16 @@ import {
   topicResponseSchema,
 } from "./schemas";
 
+type MeteredInput<T> = T & {
+  operationId: string;
+};
+
 async function postJsonStream<TResponse>(
   url: string,
   payload: unknown,
   validate: (data: unknown) => TResponse,
-  onProgress?: (event: WorkflowProgressEvent) => void
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onCredits?: (balance: CreditBalance) => void
 ): Promise<TResponse> {
   const response = await fetch(url, {
     method: "POST",
@@ -62,11 +68,14 @@ async function postJsonStream<TResponse>(
       if (!line.trim()) continue;
       const payload = JSON.parse(line) as
         | { type: "progress"; event: WorkflowProgressEvent }
+        | { type: "credits"; balance: CreditBalance }
         | { type: "result"; data: unknown }
         | { type: "error"; error: string };
 
       if (payload.type === "progress") {
         onProgress?.(payload.event);
+      } else if (payload.type === "credits") {
+        onCredits?.(payload.balance);
       } else if (payload.type === "result") {
         result = validate(payload.data);
       } else if (payload.type === "error") {
@@ -85,61 +94,71 @@ async function postJsonStream<TResponse>(
 }
 
 export function generateTopics(
-  input: GenerateTopicsInput,
-  onProgress?: (event: WorkflowProgressEvent) => void
+  input: MeteredInput<GenerateTopicsInput>,
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onCredits?: (balance: CreditBalance) => void
 ): Promise<GenerateTopicsOutput> {
   return postJsonStream(
     "/api/ai/topics/stream",
     input,
     (data) => topicResponseSchema.parse(data),
-    onProgress
+    onProgress,
+    onCredits
   );
 }
 
 export function generateBrief(
-  input: GenerateBriefInput,
-  onProgress?: (event: WorkflowProgressEvent) => void
+  input: MeteredInput<GenerateBriefInput>,
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onCredits?: (balance: CreditBalance) => void
 ): Promise<GenerateBriefOutput> {
   return postJsonStream(
     "/api/ai/brief/stream",
     input,
     (data) => briefResponseSchema.parse(data),
-    onProgress
+    onProgress,
+    onCredits
   );
 }
 
 export function generateOutline(
-  input: GenerateOutlineInput,
-  onProgress?: (event: WorkflowProgressEvent) => void
+  input: MeteredInput<GenerateOutlineInput>,
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onCredits?: (balance: CreditBalance) => void
 ): Promise<GenerateOutlineOutput> {
   return postJsonStream(
     "/api/ai/outline/stream",
     input,
     (data) => outlineResponseSchema.parse(data),
-    onProgress
+    onProgress,
+    onCredits
   );
 }
 
 export function generateDraft(
-  input: GenerateDraftInput,
-  onProgress?: (event: WorkflowProgressEvent) => void
+  input: MeteredInput<GenerateDraftInput>,
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onCredits?: (balance: CreditBalance) => void
 ): Promise<GenerateDraftOutput> {
   return postJsonStream(
     "/api/ai/draft/stream",
     input,
     (data) => draftResponseSchema.parse(data),
-    onProgress
+    onProgress,
+    onCredits
   );
 }
 
 export function generateTitlesAndSummaries(
-  input: GenerateTitlesAndSummariesInput,
-  onProgress?: (event: WorkflowProgressEvent) => void
+  input: MeteredInput<GenerateTitlesAndSummariesInput>,
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onCredits?: (balance: CreditBalance) => void
 ): Promise<GenerateTitlesAndSummariesOutput> {
   return postJsonStream(
     "/api/ai/meta/stream",
     input,
     (data) => metaResponseSchema.parse(data),
-    onProgress
+    onProgress,
+    onCredits
   );
 }

@@ -92,6 +92,19 @@ export type GenerateDraftInput = {
 export type GenerateDraftOutput = {
   drafts: DraftVersion[];
   searchContext?: SearchReferenceBundle;
+  humanizationStatus?: "success" | "degraded";
+};
+
+export type HumanizeDraftsInput = {
+  drafts: DraftVersion[];
+  coreViewpoint: string;
+  briefPersona: string;
+  briefTone: string;
+  briefDropOffPoint: string;
+};
+
+export type HumanizeDraftsOutput = {
+  drafts: DraftVersion[];
 };
 
 export type GenerateTitlesAndSummariesInput = {

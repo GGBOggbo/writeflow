@@ -12,6 +12,7 @@ export function BriefStage() {
   const {
     state,
     loading,
+    canGenerate,
     handleConfirmBrief,
     handleBriefUpdate,
     handleStructureTypeChange,
@@ -192,10 +193,10 @@ export function BriefStage() {
       <button
         type="button"
         className="rounded-full bg-[var(--accent-ink)] px-5 py-3 text-sm font-semibold text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:bg-stone-300"
-        onClick={handleConfirmBrief}
-        disabled={loading}
+        onClick={() => void handleConfirmBrief()}
+        disabled={loading || !canGenerate}
       >
-        {loading ? "正在生成大纲..." : "确认提纲"}
+        {loading ? "正在生成大纲..." : canGenerate ? "确认提纲" : "积分不足"}
       </button>
     </section>
   );

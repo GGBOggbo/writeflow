@@ -17,12 +17,30 @@ type GenerationPulseStep = {
 
 const actionTimelines: Record<GenerationAction, GenerationPulseStep[]> = {
   generate_topics: [
-    { label: "提炼搜索词", detail: "从想法里抽赛道、人群和痛点", eventIds: ["search_query_built"] },
-    { label: "微信搜一搜", detail: "按热度抓公众号参考", eventIds: ["web_search_started", "web_search_completed"] },
-    { label: "8 篇建档", detail: "规范化成 SearchResult", eventIds: ["results_normalized"] },
-    { label: "5 篇互动验证", detail: "读取阅读、点赞、收藏、评论", eventIds: ["engagement_enrichment_started", "engagement_enrichment_completed"] },
-    { label: "2 篇深拆", detail: "抓 HTML 正文与高赞评论", eventIds: ["deep_dive_started", "deep_dive_completed"] },
-    { label: "生成选题", detail: "把参考压进 3 个方向", eventIds: ["topics_generation_started", "topics_generation_completed"] },
+    {
+      label: "看清同类内容",
+      detail: "摸清大家都在谈什么",
+      eventIds: ["search_query_built", "web_search_started", "web_search_completed"],
+    },
+    {
+      label: "寻找真实信号",
+      detail: "优先保留更有反馈的表达",
+      eventIds: [
+        "results_normalized",
+        "engagement_enrichment_started",
+        "engagement_enrichment_completed",
+      ],
+    },
+    {
+      label: "拆出有效打法",
+      detail: "看懂哪些结构和情绪真正留人",
+      eventIds: ["deep_dive_started", "deep_dive_completed"],
+    },
+    {
+      label: "策划你的切口",
+      detail: "避开同质化，给出 3 条可展开方向",
+      eventIds: ["topics_generation_started", "topics_generation_completed"],
+    },
   ],
   select_topic: [
     { label: "锁定切口", detail: "确认方向、人群和核心观点", eventIds: ["brief_generation_started"] },
@@ -39,6 +57,7 @@ const actionTimelines: Record<GenerationAction, GenerationPulseStep[]> = {
     { label: "AI 总结对标文", detail: "提炼卡点、结构和节奏", eventIds: ["benchmark_summary_started", "benchmark_summary_completed"] },
     { label: "吸收评论卡点", detail: "把高赞评论转成读者需求", eventIds: ["benchmark_summary_completed"] },
     { label: "生成正文初稿", detail: "按大纲和人设组装成稿", eventIds: ["draft_generation_started", "draft_generation_completed"] },
+    { label: "去掉机器腔", detail: "终审句式、节奏和表达痕迹", eventIds: ["draft_humanization_started", "draft_humanization_completed"] },
   ],
   generate_meta: [
     { label: "读取正文", detail: "只基于已选正文包装", eventIds: ["meta_generation_started"] },
@@ -97,6 +116,11 @@ export function GenerationPulse({
 
   const steps = getGenerationPulseSteps(action);
   const eventIds = new Set(events.map((event) => event.stepId));
+  const isTopicGeneration = action === "generate_topics";
+  const heading = isTopicGeneration ? "主编正在判断" : "生成导演台";
+  const description = isTopicGeneration
+    ? "先看清外面怎么写，再替你寻找不撞车的切口。"
+    : message ?? "系统正在推进当前阶段...";
 
   return (
     <section
@@ -108,10 +132,10 @@ export function GenerationPulse({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5f7993]">
-              生成导演台
+              {heading}
             </p>
             <p className="editorial-copy mt-2 text-sm font-medium text-[#233044]">
-              {message ?? "系统正在推进当前阶段..."}
+              {description}
             </p>
           </div>
           <span className="generation-pulse__orb" aria-hidden="true" />

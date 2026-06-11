@@ -1,16 +1,62 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as aiService from "@/lib/ai/service";
+import { topicRequestSchema } from "@/lib/ai/schemas";
+import { streamJsonResponse } from "./_stream";
 import { POST as postTopics } from "./topics/route";
 import { POST as postTopicsStream } from "./topics/stream/route";
 
+const creditMocks = vi.hoisted(() => ({
+  reserve: vi.fn(),
+  consume: vi.fn(),
+  refund: vi.fn(),
+}));
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: vi.fn().mockResolvedValue({
+        user: { id: "test-user" },
+      }),
+    },
+  },
+}));
+
+vi.mock("@/lib/credits", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/credits")>();
+  return {
+    ...actual,
+    creditStore: creditMocks,
+  };
+});
+
+const operationId = "11111111-1111-4111-8111-111111111111";
+
 describe("AI routes", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
+  beforeEach(() => {
+    creditMocks.reserve.mockReset().mockReturnValue({
+      unlimited: false,
+      remaining: 4,
+    });
+    creditMocks.consume.mockReset().mockReturnValue({
+      unlimited: false,
+      remaining: 4,
+    });
+    creditMocks.refund.mockReset().mockReturnValue({
+      unlimited: false,
+      remaining: 5,
+    });
   });
 
-  it("returns topics from the topics route", async () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("charges a credit when the topics route succeeds", async () => {
     const request = new Request("http://localhost:3000/api/ai/topics", {
       method: "POST",
       body: JSON.stringify({
+        operationId,
         idea: "公众号 AI 写作流程",
       }),
       headers: {
@@ -23,12 +69,24 @@ describe("AI routes", () => {
 
     expect(response.status).toBe(200);
     expect(json.topics.length).toBeGreaterThan(0);
+    expect(response.headers.get("X-Credits-Remaining")).toBe("4");
+    expect(creditMocks.reserve).toHaveBeenCalledWith(
+      "test-user",
+      "topics",
+      operationId
+    );
+    expect(creditMocks.consume).toHaveBeenCalledWith(
+      "test-user",
+      operationId
+    );
+    expect(creditMocks.refund).not.toHaveBeenCalled();
   });
 
-  it("streams progress events before the final topics result", async () => {
+  it("streams the balance and result after charging a credit", async () => {
     const request = new Request("http://localhost:3000/api/ai/topics/stream", {
       method: "POST",
       body: JSON.stringify({
+        operationId,
         idea: "公众号 AI 写作流程",
       }),
       headers: {
@@ -45,15 +103,28 @@ describe("AI routes", () => {
 
     expect(response.headers.get("Content-Type")).toContain("application/x-ndjson");
     expect(payloads.some((payload) => payload.type === "progress")).toBe(true);
+    expect(payloads.some((payload) => payload.type === "credits")).toBe(true);
     expect(payloads[payloads.length - 1].type).toBe("result");
+    expect(creditMocks.reserve).toHaveBeenCalledWith(
+      "test-user",
+      "topics",
+      operationId
+    );
+    expect(creditMocks.consume).toHaveBeenCalledWith(
+      "test-user",
+      operationId
+    );
   });
 
-  it("returns a clear error when a real provider is selected without a key", async () => {
-    vi.stubEnv("AI_PROVIDER", "openai");
+  it("refunds the reserved credit when JSON generation fails", async () => {
+    vi.spyOn(aiService, "generateTopics").mockRejectedValueOnce(
+      new Error("provider unavailable")
+    );
 
     const request = new Request("http://localhost:3000/api/ai/topics", {
       method: "POST",
       body: JSON.stringify({
+        operationId,
         idea: "real provider",
       }),
       headers: {
@@ -65,15 +136,19 @@ describe("AI routes", () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
-    expect(String(json.error)).toMatch(/OPENAI_API_KEY|openai/i);
+    expect(String(json.error)).toMatch(/provider unavailable/i);
+    expect(creditMocks.refund).toHaveBeenCalledWith(
+      "test-user",
+      operationId
+    );
+    expect(creditMocks.consume).not.toHaveBeenCalled();
   });
 
-  it("returns a clear error when mimo is selected without a key", async () => {
-    vi.stubEnv("AI_PROVIDER", "mimo");
-
-    const request = new Request("http://localhost:3000/api/ai/topics", {
+  it("refunds the reserved credit when streamed generation fails", async () => {
+    const request = new Request("http://localhost:3000/api/ai/topics/stream", {
       method: "POST",
       body: JSON.stringify({
+        operationId,
         idea: "mimo provider",
       }),
       headers: {
@@ -81,10 +156,27 @@ describe("AI routes", () => {
       },
     });
 
-    const response = await postTopics(request);
-    const json = await response.json();
+    const response = await streamJsonResponse(
+      request,
+      topicRequestSchema,
+      "topics",
+      async () => {
+        throw new Error("provider unavailable");
+      }
+    );
+    const text = await response.text();
+    const payloads = text
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
 
-    expect(response.status).toBe(500);
-    expect(String(json.error)).toMatch(/MIMO_API_KEY|mimo/i);
+    expect(
+      payloads.some((payload) => payload.type === "error")
+    ).toBe(true);
+    expect(creditMocks.refund).toHaveBeenCalledWith(
+      "test-user",
+      operationId
+    );
+    expect(creditMocks.consume).not.toHaveBeenCalled();
   });
 });

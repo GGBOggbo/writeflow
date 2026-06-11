@@ -167,6 +167,11 @@ export const mockAIProvider: AIProvider = {
     };
   },
 
+  async humanizeDrafts({ drafts }) {
+    await wait(80);
+    return { drafts };
+  },
+
   async generateTitlesAndSummaries({
     topicLabel,
     coreViewpoint,

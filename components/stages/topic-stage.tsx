@@ -3,7 +3,8 @@
 import { useWorkflowContext } from "../workflow-context";
 
 export function TopicStage() {
-  const { state, loading, handleSelectTopic } = useWorkflowContext();
+  const { state, loading, canGenerate, handleSelectTopic } =
+    useWorkflowContext();
 
   return (
     <section className="space-y-6">
@@ -46,7 +47,7 @@ export function TopicStage() {
                   : "hover:-translate-y-1 hover:border-[rgba(35,48,68,0.16)]",
               ].join(" ")}
               onClick={() => handleSelectTopic(topic.id)}
-              disabled={loading}
+              disabled={loading || !canGenerate}
             >
               {isSelected ? (
                 <span className="absolute right-4 top-4 rounded-full border border-[rgba(35,48,68,0.08)] bg-white/88 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#233044]">

@@ -62,6 +62,44 @@ function attachBenchmarkSummaries(
   };
 }
 
+function extractMaterialPlaceholders(content: string) {
+  return content.match(/【💡需要你补充：[^】]*】/g) ?? [];
+}
+
+function assertHumanizedDraftsPreserveSource(
+  source: GenerateDraftOutput["drafts"],
+  humanized: GenerateDraftOutput["drafts"]
+) {
+  if (source.length !== humanized.length) {
+    throw new Error("去 AI 润色改变了正文版本数量。");
+  }
+
+  source.forEach((draft, index) => {
+    const rewritten = humanized[index];
+
+    if (
+      !rewritten ||
+      rewritten.id !== draft.id ||
+      rewritten.label !== draft.label
+    ) {
+      throw new Error("去 AI 润色改变了正文版本身份。");
+    }
+
+    const sourcePlaceholders = extractMaterialPlaceholders(draft.content);
+    const rewrittenPlaceholders = extractMaterialPlaceholders(rewritten.content);
+
+    if (
+      sourcePlaceholders.length !== rewrittenPlaceholders.length ||
+      sourcePlaceholders.some(
+        (placeholder, placeholderIndex) =>
+          rewrittenPlaceholders[placeholderIndex] !== placeholder
+      )
+    ) {
+      throw new Error("去 AI 润色改变了素材占位符。");
+    }
+  });
+}
+
 async function summarizeDraftBenchmarks(
   provider: AIProvider,
   searchContext: SearchReferenceBundle | null,
@@ -127,8 +165,8 @@ export async function generateTopics(
 
   options?.onProgress?.({
     stepId: "topics_generation_started",
-    label: "生成选题",
-    detail: "把搜索参考压进 3 个方向",
+    label: "策划选题",
+    detail: "融合参考素材，构思选题方向",
   });
   const providerResult = await getProvider().generateTopics({
     ...input,
@@ -136,7 +174,7 @@ export async function generateTopics(
   });
   options?.onProgress?.({
     stepId: "topics_generation_completed",
-    label: "生成选题完成",
+    label: "策划选题完成",
   });
 
   return topicResponseSchema.parse({
@@ -233,9 +271,47 @@ export async function generateDraft(
     label: "生成正文初稿完成",
   });
 
+  options?.onProgress?.({
+    stepId: "draft_humanization_started",
+    label: "去掉机器腔",
+    detail: "终审句式、节奏和表达痕迹",
+  });
+
+  try {
+    const humanizedResult = await provider.humanizeDrafts({
+      drafts: providerResult.drafts,
+      coreViewpoint: input.coreViewpoint,
+      briefPersona: input.briefPersona,
+      briefTone: input.briefTone,
+      briefDropOffPoint: input.briefDropOffPoint,
+    });
+    assertHumanizedDraftsPreserveSource(
+      providerResult.drafts,
+      humanizedResult.drafts
+    );
+    options?.onProgress?.({
+      stepId: "draft_humanization_completed",
+      label: "去掉机器腔完成",
+    });
+
+    return draftResponseSchema.parse({
+      ...providerResult,
+      drafts: humanizedResult.drafts,
+      searchContext: enrichedSearchContext ?? undefined,
+      humanizationStatus: "success",
+    });
+  } catch {
+    options?.onProgress?.({
+      stepId: "draft_humanization_completed",
+      label: "保留原始正文",
+      detail: "终审润色未完成，已安全保留初稿",
+    });
+  }
+
   return draftResponseSchema.parse({
     ...providerResult,
     searchContext: enrichedSearchContext ?? undefined,
+    humanizationStatus: "degraded",
   });
 }
 
