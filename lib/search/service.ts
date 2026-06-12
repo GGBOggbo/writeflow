@@ -12,6 +12,7 @@ import type {
   SearchReferenceBundle,
   SearchSortType,
 } from "./types";
+import type { TopicSearchPlan } from "./topic-search-plan";
 
 function getSearchProvider() {
   const providerName = process.env.SEARCH_PROVIDER?.trim().toLowerCase();
@@ -205,7 +206,8 @@ async function fetchAndNormalize(
   query: string,
   intent: SearchIntent,
   mode: SearchMode,
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  topicPlan?: TopicSearchPlan
 ): Promise<SearchReferenceBundle> {
   const freshness = getFreshnessForIntent(intent);
   const sortType = getSortTypeForIntent(intent);
@@ -216,6 +218,7 @@ async function fetchAndNormalize(
       mode,
       freshness,
       sortType,
+      topicPlan,
     },
     onProgress
   );
@@ -248,10 +251,11 @@ async function safeSearch(
   query: string,
   intent: SearchIntent,
   mode: SearchMode,
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  topicPlan?: TopicSearchPlan
 ): Promise<SearchReferenceBundle> {
   try {
-    return await fetchAndNormalize(query, intent, mode, onProgress);
+    return await fetchAndNormalize(query, intent, mode, onProgress, topicPlan);
   } catch (err) {
     log.error("search", intent, err);
     return createEmptyBundle("degraded", query, intent, getFreshnessForIntent(intent));
@@ -297,15 +301,16 @@ export function buildMetaSearchQuery(
 export function searchForTopics(
   idea: string,
   mode: SearchMode,
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  topicPlan?: TopicSearchPlan
 ) {
-  const query = buildTopicsSearchQuery(idea);
+  const query = topicPlan?.realtimeKeyword ?? buildTopicsSearchQuery(idea);
   onProgress?.({
     stepId: "search_query_built",
     label: "拆解命题",
     detail: "捕捉话题信号",
   });
-  return safeSearch(query, "topics", mode, onProgress);
+  return safeSearch(query, "topics", mode, onProgress, topicPlan);
 }
 
 export function buildBriefSearchQuery(topicLabel: string, topicAngle: string, coreViewpoint: string) {

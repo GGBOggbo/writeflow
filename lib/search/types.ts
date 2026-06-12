@@ -1,3 +1,5 @@
+import type { TopicSearchPlan } from "./topic-search-plan";
+
 export type { TopicSearchPlan } from "./topic-search-plan";
 
 export type SearchSource = "wechat" | "xiaohongshu" | "hotlist" | "generic";
@@ -84,4 +86,5 @@ export type SearchQueryInput = {
   mode: SearchMode;
   freshness: SearchFreshness;
   sortType: SearchSortType;
+  topicPlan?: TopicSearchPlan;
 };

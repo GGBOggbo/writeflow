@@ -8,6 +8,7 @@ import {
   generateTopics,
 } from "./service";
 import * as searchService from "@/lib/search/service";
+import { mockAIProvider } from "./mock-provider";
 
 describe("AI service", () => {
   afterEach(() => {
@@ -32,6 +33,79 @@ describe("AI service", () => {
     });
 
     expect(result.topics[0]?.title).toContain("配置 provider");
+  });
+
+  it("plans every enabled topic search before retrieval", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const planSpy = vi.spyOn(mockAIProvider, "planTopicSearch");
+    const searchSpy = vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce({
+      status: "empty",
+      query: "GPT-5.6",
+      intent: "topics",
+      freshness: "pastMonth",
+      results: [],
+      seoKeywords: [],
+      crowdedness: "low",
+      staleBuzzwords: [],
+      notes: [],
+    });
+    const events: string[] = [];
+
+    await generateTopics(
+      {
+        idea: "GPT-5.6",
+        searchEnabled: true,
+        searchMode: "default",
+      },
+      { onProgress: (event) => events.push(event.stepId) }
+    );
+
+    expect(planSpy).toHaveBeenCalledWith("GPT-5.6");
+    expect(searchSpy).toHaveBeenCalledWith(
+      "GPT-5.6",
+      "default",
+      expect.any(Function),
+      expect.objectContaining({
+        coreTopic: "GPT-5.6",
+        requiredTerms: ["GPT-5.6"],
+      })
+    );
+    expect(events.slice(0, 2)).toEqual([
+      "topic_search_planning_started",
+      "topic_search_planning_completed",
+    ]);
+  });
+
+  it("falls back to a safe plan when AI search planning fails", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.spyOn(mockAIProvider, "planTopicSearch").mockRejectedValueOnce(
+      new Error("planner unavailable")
+    );
+    const searchSpy = vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce({
+      status: "empty",
+      query: "GPT-5.6",
+      intent: "topics",
+      freshness: "pastMonth",
+      results: [],
+      seoKeywords: [],
+      crowdedness: "low",
+      staleBuzzwords: [],
+      notes: [],
+    });
+
+    const result = await generateTopics({
+      idea: "GPT-5.6",
+      searchEnabled: true,
+      searchMode: "default",
+    });
+
+    expect(result.topics).toHaveLength(3);
+    expect(searchSpy).toHaveBeenCalledWith(
+      "GPT-5.6",
+      "default",
+      undefined,
+      expect.objectContaining({ requiredTerms: ["GPT-5.6"] })
+    );
   });
 
   it("throws a clear error for unsupported providers", async () => {
@@ -101,7 +175,30 @@ describe("AI service", () => {
 
     vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce(searchContext);
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    coreTopic: "AI 写作流程",
+                    historyKeyword: "AI 写作",
+                    realtimeKeyword: "AI 写作流程",
+                    requiredTerms: ["AI 写作"],
+                    relatedTerms: ["工作流"],
+                    excludedTerms: [],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           choices: [
@@ -123,7 +220,7 @@ describe("AI service", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       )
-    );
+      );
 
     const result = await generateTopics({
       idea: "AI 写作流程",
@@ -132,7 +229,7 @@ describe("AI service", () => {
     });
 
     expect(result.searchContext).toEqual(searchContext);
-    expect(fetchSpy.mock.calls[0]?.[1]?.body).toEqual(
+    expect(fetchSpy.mock.calls[1]?.[1]?.body).toEqual(
       expect.stringContaining("搜索 query：AI 写作 痛点")
     );
   });
@@ -144,7 +241,30 @@ describe("AI service", () => {
     vi.stubEnv("MIMO_MODEL", "mimo-v2.5-pro");
 
     const briefSearchSpy = vi.spyOn(searchService, "searchForBrief");
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    coreTopic: "AI 写作流程",
+                    historyKeyword: "AI 写作",
+                    realtimeKeyword: "AI 写作流程",
+                    requiredTerms: ["AI 写作"],
+                    relatedTerms: ["工作流"],
+                    excludedTerms: [],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           choices: [
@@ -166,7 +286,7 @@ describe("AI service", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       )
-    );
+      );
 
     await generateBrief({
       topicId: "topic-1",
@@ -221,29 +341,52 @@ describe("AI service", () => {
       notes: [],
     });
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  topics: [
-                    {
-                      id: "topic-1",
-                      title: "AI 写作流程的增长打法",
-                      angle: "从流程拆解切入",
-                      summary: "强调低成本验证主流程。",
-                    },
-                  ],
-                }),
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    coreTopic: "AI 写作流程",
+                    historyKeyword: "AI 写作",
+                    realtimeKeyword: "AI 写作流程",
+                    requiredTerms: ["AI 写作"],
+                    relatedTerms: ["工作流"],
+                    excludedTerms: [],
+                  }),
+                },
               },
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
       )
-    );
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    topics: [
+                      {
+                        id: "topic-1",
+                        title: "AI 写作流程的增长打法",
+                        angle: "从流程拆解切入",
+                        summary: "强调低成本验证主流程。",
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
 
     await generateTopics({
       idea: "AI 写作流程",
@@ -251,7 +394,7 @@ describe("AI service", () => {
       searchMode: "default",
     });
 
-    expect(fetchSpy.mock.calls[0]?.[1]?.body).not.toEqual(
+    expect(fetchSpy.mock.calls[1]?.[1]?.body).not.toEqual(
       expect.stringContaining("搜索 query：AI 写作 痛点")
     );
   });
@@ -274,7 +417,30 @@ describe("AI service", () => {
       notes: [],
     });
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    coreTopic: "AI 写作流程",
+                    historyKeyword: "AI 写作",
+                    realtimeKeyword: "AI 写作流程",
+                    requiredTerms: ["AI 写作"],
+                    relatedTerms: ["工作流"],
+                    excludedTerms: [],
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           choices: [
@@ -296,7 +462,7 @@ describe("AI service", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       )
-    );
+      );
 
     await generateTopics({
       idea: "AI 写作流程",
@@ -304,7 +470,7 @@ describe("AI service", () => {
       searchMode: "default",
     });
 
-    expect(fetchSpy.mock.calls[0]?.[1]?.body).not.toEqual(
+    expect(fetchSpy.mock.calls[1]?.[1]?.body).not.toEqual(
       expect.stringContaining("搜索 query：AI 写作 痛点")
     );
   });

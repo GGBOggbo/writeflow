@@ -6,10 +6,11 @@ import {
 } from "./generation-pulse";
 
 describe("GenerationPulse", () => {
-  it("presents topic generation as four editorial judgments", () => {
+  it("presents topic generation as five editorial judgments", () => {
     const steps = getGenerationPulseSteps("generate_topics");
 
     expect(steps.map((step) => step.label)).toEqual([
+      "理解创作意图",
       "看清同类内容",
       "寻找真实信号",
       "拆出有效打法",

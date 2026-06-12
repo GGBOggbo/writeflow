@@ -1,4 +1,6 @@
 export type WorkflowProgressStepId =
+  | "topic_search_planning_started"
+  | "topic_search_planning_completed"
   | "search_query_built"
   | "web_search_started"
   | "web_search_completed"

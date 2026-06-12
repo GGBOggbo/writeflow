@@ -19,6 +19,14 @@ type GenerationPulseStep = {
 const actionTimelines: Record<GenerationAction, GenerationPulseStep[]> = {
   generate_topics: [
     {
+      label: "理解创作意图",
+      detail: "提炼主题、实体和需要避开的方向",
+      eventIds: [
+        "topic_search_planning_started",
+        "topic_search_planning_completed",
+      ],
+    },
+    {
       label: "看清同类内容",
       detail: "摸清大家都在谈什么",
       eventIds: ["search_query_built", "web_search_started", "web_search_completed"],

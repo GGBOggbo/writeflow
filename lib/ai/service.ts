@@ -29,6 +29,11 @@ import type { AIProvider } from "./provider";
 import { createRealAIProvider } from "./real-provider";
 import { searchForTopics } from "@/lib/search/service";
 import {
+  buildFallbackTopicSearchPlan,
+  topicSearchPlanSchema,
+} from "@/lib/search/topic-search-plan";
+import type { TopicSearchPlan } from "@/lib/search/topic-search-plan";
+import {
   briefResponseSchema,
   draftResponseSchema,
   humanizeDraftResponseSchema,
@@ -167,8 +172,38 @@ export async function generateTopics(
   input: GenerateTopicsInput,
   options?: { onProgress?: ProgressReporter }
 ): Promise<GenerateTopicsOutput> {
+  const provider = getProvider();
+  let topicPlan: TopicSearchPlan | undefined;
+
+  if (input.searchEnabled) {
+    options?.onProgress?.({
+      stepId: "topic_search_planning_started",
+      label: "理解创作意图",
+      detail: "提炼核心主题、实体和搜索边界",
+    });
+
+    try {
+      topicPlan = topicSearchPlanSchema.parse(
+        await provider.planTopicSearch(input.idea)
+      );
+    } catch {
+      topicPlan = buildFallbackTopicSearchPlan(input.idea);
+    }
+
+    options?.onProgress?.({
+      stepId: "topic_search_planning_completed",
+      label: "理解创作意图完成",
+      detail: `核心主题：${topicPlan.coreTopic}`,
+    });
+  }
+
   const searchResult = input.searchEnabled
-    ? await searchForTopics(input.idea, input.searchMode ?? "default", options?.onProgress)
+    ? await searchForTopics(
+        input.idea,
+        input.searchMode ?? "default",
+        options?.onProgress,
+        topicPlan
+      )
     : null;
   const searchContext =
     searchResult?.status === "success" ? searchResult : null;
@@ -178,7 +213,7 @@ export async function generateTopics(
     label: "策划选题",
     detail: "融合参考素材，构思选题方向",
   });
-  const providerResult = await getProvider().generateTopics({
+  const providerResult = await provider.generateTopics({
     ...input,
     searchContext,
   });
