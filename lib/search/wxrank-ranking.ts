@@ -258,42 +258,123 @@ function isTopicSearchPlan(
   return !Array.isArray(value);
 }
 
-export function isRelevantToTopicPlan(
+export type TopicPlanRelevanceEvaluation = {
+  retained: boolean;
+  matchedTerms: string[];
+  score: number;
+  reasons: string[];
+  rejectionReason?: string;
+};
+
+export function evaluateTopicPlanRelevance(
   title: string,
   content: string,
   plan: TopicSearchPlan
-) {
+): TopicPlanRelevanceEvaluation {
   const requiredTerms = normalizedPlanTerms(plan.requiredTerms);
-  if (requiredTerms.length === 0) return false;
+  if (requiredTerms.length === 0) {
+    return {
+      retained: false,
+      matchedTerms: [],
+      score: 0,
+      reasons: [],
+      rejectionReason: "缺少核心词配置",
+    };
+  }
 
   const preciseTerms = requiredTerms.filter(isPreciseEntity);
   const broadTerms = requiredTerms.filter((term) => !isPreciseEntity(term));
   const relatedTerms = normalizedPlanTerms(plan.relatedTerms);
   const excludedTerms = normalizedPlanTerms(plan.excludedTerms);
   const searchableText = `${title}\n${content}`;
+  const allTerms = [...requiredTerms, ...relatedTerms, ...excludedTerms];
+  const matchedTerms = uniqueTerms(
+    allTerms.filter((term) => termMatches(searchableText, term))
+  );
   const preciseTitleMatch = preciseTerms.some((term) => termMatches(title, term));
   const preciseMatch = preciseTerms.some((term) => termMatches(searchableText, term));
   const broadTitleMatch = broadTerms.some((term) => termMatches(title, term));
   const broadMatch = broadTerms.some((term) => termMatches(searchableText, term));
   const excludedTitleMatch = excludedTerms.some((term) => termMatches(title, term));
+  const relatedMatch = relatedTerms.some((term) => termMatches(searchableText, term));
+  const titleMatchCount = countTermMatches(title, [...requiredTerms, ...relatedTerms]);
+  const contentMatchCount = countTermMatches(content, [...requiredTerms, ...relatedTerms]);
+  const score = titleMatchCount * 3 + contentMatchCount;
 
   if (excludedTitleMatch && !preciseTitleMatch) {
-    return false;
+    return {
+      retained: false,
+      matchedTerms,
+      score,
+      reasons: [],
+      rejectionReason: "命中排除方向",
+    };
   }
 
   if (preciseMatch) {
-    return true;
+    return {
+      retained: true,
+      matchedTerms,
+      score,
+      reasons: [
+        "命中精确核心词",
+        ...(relatedMatch ? ["命中相关场景"] : []),
+      ],
+    };
   }
 
   if (!broadMatch) {
-    return false;
+    return {
+      retained: false,
+      matchedTerms,
+      score,
+      reasons: [],
+      rejectionReason: "缺少核心词",
+    };
   }
 
   if (relatedTerms.length === 0) {
-    return broadTitleMatch;
+    return broadTitleMatch
+      ? {
+          retained: true,
+          matchedTerms,
+          score,
+          reasons: ["标题命中核心词"],
+        }
+      : {
+          retained: false,
+          matchedTerms,
+          score,
+          reasons: [],
+          rejectionReason: "核心词仅在正文弱命中",
+        };
   }
 
-  return relatedTerms.some((term) => termMatches(searchableText, term));
+  return relatedMatch
+    ? {
+        retained: true,
+        matchedTerms,
+        score,
+        reasons: [
+          broadTitleMatch ? "标题命中核心词" : "正文命中核心词",
+          "命中相关场景",
+        ],
+      }
+    : {
+        retained: false,
+        matchedTerms,
+        score,
+        reasons: [],
+        rejectionReason: "缺少相关场景",
+      };
+}
+
+export function isRelevantToTopicPlan(
+  title: string,
+  content: string,
+  plan: TopicSearchPlan
+) {
+  return evaluateTopicPlanRelevance(title, content, plan).retained;
 }
 
 function engagementScore(article: WxrankHistoricalArticle) {

@@ -28,6 +28,7 @@ import { getProviderName } from "./provider-config";
 import type { AIProvider } from "./provider";
 import { createRealAIProvider } from "./real-provider";
 import { searchForTopics } from "@/lib/search/service";
+import { log } from "@/lib/debug";
 import {
   buildFallbackTopicSearchPlan,
   topicSearchPlanSchema,
@@ -41,6 +42,47 @@ import {
   outlineResponseSchema,
   topicResponseSchema,
 } from "./schemas";
+import { formatSearchReference } from "./prompts/search-context";
+
+function logPreview(value: string, limit = 120) {
+  return value.replace(/[\n\r\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+function safeErrorType(error: unknown) {
+  return error instanceof Error ? error.name : typeof error;
+}
+
+function addedNumericTerms(input: string, plan: TopicSearchPlan) {
+  const inputTerms = new Set(input.match(/\b(?:19|20)\d{2}\b/g) ?? []);
+  const plannedText = [
+    plan.historyKeyword,
+    plan.realtimeKeyword,
+    ...plan.requiredTerms,
+    ...plan.relatedTerms,
+  ].join(" ");
+
+  return [...new Set(plannedText.match(/\b(?:19|20)\d{2}\b/g) ?? [])]
+    .filter((term) => !inputTerms.has(term));
+}
+
+function topicReferenceStats(searchContext: SearchReferenceBundle | null) {
+  const results = searchContext?.results ?? [];
+  const promptResults = results.slice(0, 4);
+  const history = results.filter((result) => Boolean(result.engagementMetrics)).length;
+
+  return {
+    searchResults: results.length,
+    history,
+    realtime: results.length - history,
+    promptReferences: promptResults.length,
+    withHtml: results.filter((result) => Boolean(result.articleHtml)).length,
+    withComments: results.filter((result) => Boolean(result.comments?.length)).length,
+    contextChars: promptResults
+      .map((result, index) => formatSearchReference(result, index))
+      .join("\n")
+      .length,
+  };
+}
 
 function getProvider(): AIProvider {
   const providerName = getProviderName();
@@ -172,8 +214,18 @@ export async function generateTopics(
   input: GenerateTopicsInput,
   options?: { onProgress?: ProgressReporter }
 ): Promise<GenerateTopicsOutput> {
+  const totalStartedAt = Date.now();
   const provider = getProvider();
   let topicPlan: TopicSearchPlan | undefined;
+  let plannerMs = 0;
+  let searchMs = 0;
+
+  log.info("topics", "start", {
+    ideaPreview: logPreview(input.idea),
+    searchEnabled: Boolean(input.searchEnabled),
+    aiProvider: getProviderName(),
+    searchProvider: process.env.SEARCH_PROVIDER?.trim().toLowerCase() || "jizhila",
+  });
 
   if (input.searchEnabled) {
     options?.onProgress?.({
@@ -182,13 +234,33 @@ export async function generateTopics(
       detail: "提炼核心主题、实体和搜索边界",
     });
 
+    const plannerStartedAt = Date.now();
+    let plannerSource: "ai" | "fallback" = "ai";
     try {
       topicPlan = topicSearchPlanSchema.parse(
         await provider.planTopicSearch(input.idea)
       );
-    } catch {
+    } catch (error) {
+      plannerSource = "fallback";
       topicPlan = buildFallbackTopicSearchPlan(input.idea);
+      log.warn("topics", "search plan fallback", {
+        source: plannerSource,
+        errorType: safeErrorType(error),
+      });
     }
+    plannerMs = Date.now() - plannerStartedAt;
+
+    log.debug("topics", "search plan", {
+      source: plannerSource,
+      elapsedMs: plannerMs,
+      coreTopic: logPreview(topicPlan.coreTopic),
+      historyKeyword: logPreview(topicPlan.historyKeyword),
+      realtimeKeyword: logPreview(topicPlan.realtimeKeyword),
+      requiredTerms: topicPlan.requiredTerms.map((term) => logPreview(term, 80)),
+      relatedTerms: topicPlan.relatedTerms.map((term) => logPreview(term, 80)),
+      excludedTerms: topicPlan.excludedTerms.map((term) => logPreview(term, 80)),
+      addedTerms: addedNumericTerms(input.idea, topicPlan),
+    });
 
     options?.onProgress?.({
       stepId: "topic_search_planning_completed",
@@ -197,6 +269,7 @@ export async function generateTopics(
     });
   }
 
+  const searchStartedAt = Date.now();
   const searchResult = input.searchEnabled
     ? await searchForTopics(
         input.idea,
@@ -205,28 +278,46 @@ export async function generateTopics(
         topicPlan
       )
     : null;
+  searchMs = input.searchEnabled ? Date.now() - searchStartedAt : 0;
   const searchContext =
     searchResult?.status === "success" ? searchResult : null;
+
+  log.info("topics", "reference context", {
+    ...topicReferenceStats(searchContext),
+    status: searchResult?.status ?? "disabled",
+  });
 
   options?.onProgress?.({
     stepId: "topics_generation_started",
     label: "策划选题",
     detail: "融合参考素材，构思选题方向",
   });
+  const generationStartedAt = Date.now();
   const providerResult = await provider.generateTopics({
     ...input,
     searchContext,
   });
+  const generationMs = Date.now() - generationStartedAt;
   options?.onProgress?.({
     stepId: "topics_generation_completed",
     label: "策划选题完成",
   });
 
-  return topicResponseSchema.parse({
+  const output = topicResponseSchema.parse({
     ...providerResult,
     searchStatus: searchResult?.status,
     searchContext: searchContext ?? undefined,
   });
+
+  log.info("topics", "completed", {
+    plannerMs,
+    searchMs,
+    generationMs,
+    totalMs: Date.now() - totalStartedAt,
+    topicCount: output.topics.length,
+  });
+
+  return output;
 }
 
 export async function generateBrief(

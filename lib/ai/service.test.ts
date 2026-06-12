@@ -76,8 +76,81 @@ describe("AI service", () => {
     ]);
   });
 
+  it("logs topic planning, reference context, and stage timings", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.stubEnv("SEARCH_PROVIDER", "wxrank");
+    vi.stubEnv("LOG_LEVEL", "debug");
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.spyOn(mockAIProvider, "planTopicSearch").mockResolvedValueOnce({
+      coreTopic: "Claude 神话模型",
+      historyKeyword: "Claude",
+      realtimeKeyword: "Claude 神话模型 2025",
+      requiredTerms: ["Claude"],
+      relatedTerms: ["神话模型"],
+      excludedTerms: [],
+    });
+    vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce({
+      status: "success",
+      query: "Claude 神话模型 2025",
+      intent: "topics",
+      freshness: "pastMonth",
+      results: [
+        {
+          title: "历史参考",
+          snippet: "摘要",
+          url: "https://mp.weixin.qq.com/s/history",
+          source: "wechat",
+          engagementMetrics: { readCount: 10_000 },
+          articleHtml: "<p>不应打印的正文</p>",
+          comments: [{ content: "不应打印的评论" }],
+        },
+        {
+          title: "实时参考",
+          snippet: "摘要",
+          url: "https://mp.weixin.qq.com/s/realtime",
+          source: "wechat",
+        },
+      ],
+      seoKeywords: [],
+      crowdedness: "low",
+      staleBuzzwords: [],
+      notes: [],
+    });
+
+    await generateTopics({
+      idea: "Claude神话模型",
+      searchEnabled: true,
+      searchMode: "default",
+    });
+
+    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(logs).toContain("[topics] → start");
+    expect(logs).toContain('"searchProvider":"wxrank"');
+    expect(logs).toContain("[topics] … search plan");
+    expect(logs).toContain('"source": "ai"');
+    expect(logs).toContain('"addedTerms": [\n    "2025"');
+    expect(logs).toContain("[topics] → reference context");
+    expect(logs).toContain('"searchResults":2');
+    expect(logs).toContain('"history":1');
+    expect(logs).toContain('"realtime":1');
+    expect(logs).toContain('"promptReferences":2');
+    expect(logs).toContain('"withHtml":1');
+    expect(logs).toContain('"withComments":1');
+    expect(logs).toMatch(/"contextChars":\d+/);
+    expect(logs).toContain("[topics] → completed");
+    expect(logs).toContain('"topicCount":3');
+    expect(logs).toMatch(/"plannerMs":\d+/);
+    expect(logs).toMatch(/"searchMs":\d+/);
+    expect(logs).toMatch(/"generationMs":\d+/);
+    expect(logs).toMatch(/"totalMs":\d+/);
+    expect(logs).not.toContain("不应打印的正文");
+    expect(logs).not.toContain("不应打印的评论");
+  });
+
   it("falls back to a safe plan when AI search planning fails", async () => {
     vi.stubEnv("AI_PROVIDER", "mock");
+    vi.stubEnv("LOG_LEVEL", "warn");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(mockAIProvider, "planTopicSearch").mockRejectedValueOnce(
       new Error("planner unavailable")
     );
@@ -106,6 +179,8 @@ describe("AI service", () => {
       undefined,
       expect.objectContaining({ requiredTerms: ["GPT-5.6"] })
     );
+    expect(warnSpy.mock.calls.map((call) => call.join(" ")).join("\n"))
+      .toContain('search plan fallback | {"source":"fallback","errorType":"Error"}');
   });
 
   it("throws a clear error for unsupported providers", async () => {

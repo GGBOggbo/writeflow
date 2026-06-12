@@ -22,8 +22,8 @@ import type {
 import { selectDeepDiveArticles } from "./jizhila-selection";
 import {
   buildWxrankQueryTerms,
+  evaluateTopicPlanRelevance,
   filterAndRankHistoricalArticles,
-  isRelevantToTopicPlan,
 } from "./wxrank-ranking";
 import type { WxrankHistoricalArticle as RankedHistoricalArticle } from "./wxrank-ranking";
 
@@ -33,6 +33,18 @@ const DEEP_DIVE_LIMIT = 2;
 
 function logKeyword(value: string) {
   return value.replace(/[\n\r\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+function logText(value: string, limit = 120) {
+  return cleanText(value).replace(/[\n\r\t]+/g, " ").slice(0, limit);
+}
+
+function errorType(error: unknown) {
+  return error instanceof Error ? error.name : typeof error;
+}
+
+function incrementReason(counts: Record<string, number>, reason: string) {
+  counts[reason] = (counts[reason] ?? 0) + 1;
 }
 
 type WxrankSearchProviderOptions = {
@@ -370,33 +382,62 @@ async function enrichOneDeepDiveArticle(
   result: SearchResult
 ): Promise<{ originalUrl: string; result: SearchResult }> {
   const originalUrl = result.url;
+  const title = logText(result.title);
+  const articleInfoStartedAt = Date.now();
 
   try {
     const articleInfo = await client.getArticleInfo(result.url);
     let enriched = applyArticleInfo(result, articleInfo);
     const commentId = articleInfo.comment_id?.toString().trim();
+    log.info("wxrank", "artinfo completed", {
+      title,
+      htmlChars: articleInfo.html.length,
+      hasCommentId: Boolean(commentId),
+      elapsedMs: Date.now() - articleInfoStartedAt,
+    });
 
     if (commentId) {
+      const commentsStartedAt = Date.now();
       try {
-        const comments = parseComments(
-          await client.getArticleComments({
-            url: enriched.url,
-            commentId,
-          })
-        );
+        const rawComments = await client.getArticleComments({
+          url: enriched.url,
+          commentId,
+        });
+        const comments = parseComments(rawComments);
+        log.info("wxrank", "getcm completed", {
+          title,
+          raw: rawComments.length,
+          retained: comments.length,
+          elapsedMs: Date.now() - commentsStartedAt,
+        });
         if (comments.length > 0) {
           enriched = {
             ...enriched,
             comments,
           };
         }
-      } catch {
+      } catch (error) {
+        log.warn("wxrank", "getcm failed; keeping article info", {
+          title,
+          errorType: errorType(error),
+          elapsedMs: Date.now() - commentsStartedAt,
+        });
         return { originalUrl, result: enriched };
       }
+    } else {
+      log.debug("wxrank", "getcm skipped", {
+        title,
+        reason: "missing-comment-id",
+      });
     }
 
     return { originalUrl, result: enriched };
-  } catch {
+  } catch (error) {
+    log.warn("wxrank", "artinfo failed; keeping base result", {
+      title,
+      errorType: errorType(error),
+      elapsedMs: Date.now() - articleInfoStartedAt,
+    });
     return { originalUrl, result };
   }
 }
@@ -421,6 +462,20 @@ async function enrichDeepDiveArticles(
   if (candidates.length === 0) {
     return results;
   }
+
+  log.debug(
+    "wxrank",
+    "deep-dive selected",
+    candidates.map((candidate, index) => ({
+      rank: index + 1,
+      title: logText(candidate.title),
+      reasons: (candidate.qualitySignals?.reasons ?? []).map((reason) =>
+        logText(reason, 80)
+      ),
+      stableScore: candidate.qualitySignals?.stableScore,
+      anomalyScore: candidate.qualitySignals?.anomalyScore,
+    }))
+  );
 
   onProgress?.({
     stepId: "deep_dive_started",
@@ -479,6 +534,7 @@ export function createWxrankSearchProvider(
       });
 
       let currentHistory: WxrankClientHistoricalArticle[] | null;
+      const currentHistoryStartedAt = Date.now();
       try {
         log.info("wxrank", "artlist", {
           month: currentMonth,
@@ -512,6 +568,9 @@ export function createWxrankSearchProvider(
         month: currentMonth,
         raw: currentHistory?.length ?? 0,
         qualified: currentQualified,
+        retained: currentQualified,
+        rejected: Math.max(0, (currentHistory?.length ?? 0) - currentQualified),
+        elapsedMs: Date.now() - currentHistoryStartedAt,
       });
 
       let rankedHistory = filterAndRankHistoricalArticles(
@@ -523,6 +582,7 @@ export function createWxrankSearchProvider(
       if (rankedHistory.length < QUALIFIED_HISTORY_THRESHOLD) {
         previousMonthRequested = true;
         let previousHistory: WxrankClientHistoricalArticle[] | null;
+        const previousHistoryStartedAt = Date.now();
         try {
           log.info("wxrank", "artlist", {
             month: previousMonthKey,
@@ -556,6 +616,9 @@ export function createWxrankSearchProvider(
           month: previousMonthKey,
           raw: previousHistory?.length ?? 0,
           qualified: previousQualified,
+          retained: previousQualified,
+          rejected: Math.max(0, (previousHistory?.length ?? 0) - previousQualified),
+          elapsedMs: Date.now() - previousHistoryStartedAt,
         });
 
         rankedHistory = filterAndRankHistoricalArticles(
@@ -572,6 +635,7 @@ export function createWxrankSearchProvider(
 
       if (rankedHistory.length < QUALIFIED_HISTORY_THRESHOLD) {
         realtimeRequested = true;
+        const realtimeStartedAt = Date.now();
         try {
           log.info("wxrank", "getso", {
             keyword: logKeyword(queryTerms.realtimeKeyword || input.query),
@@ -580,21 +644,36 @@ export function createWxrankSearchProvider(
             keyword: queryTerms.realtimeKeyword || input.query,
             sortType: 4,
           });
-          const realtimeResults = realtime
-            .map(mapRealtimeResult)
-            .filter(
-              (result) =>
-                !input.topicPlan ||
-                isRelevantToTopicPlan(
-                  result.title,
-                  result.snippet,
-                  input.topicPlan
-                )
+          const rejectedReasons: Record<string, number> = {};
+          const realtimeResults = realtime.flatMap((article) => {
+            const result = mapRealtimeResult(article);
+            if (!input.topicPlan) {
+              return [result];
+            }
+
+            const evaluation = evaluateTopicPlanRelevance(
+              result.title,
+              result.snippet,
+              input.topicPlan
             );
+            if (evaluation.retained) {
+              return [result];
+            }
+
+            incrementReason(
+              rejectedReasons,
+              evaluation.rejectionReason ?? "相关度不足"
+            );
+            return [];
+          });
           realtimeQualified = realtimeResults.length;
           log.info("wxrank", "getso completed", {
             raw: realtime.length,
             qualified: realtimeQualified,
+            retained: realtimeQualified,
+            rejected: realtime.length - realtimeQualified,
+            elapsedMs: Date.now() - realtimeStartedAt,
+            rejectedReasons,
           });
           results = dedupeByUrl([
             ...results,
@@ -627,6 +706,29 @@ export function createWxrankSearchProvider(
         historyQualified: rankedHistory.length,
         realtimeQualified,
         final: results.length,
+      });
+
+      results.forEach((result, index) => {
+        const origin = result.engagementMetrics ? "history" : "realtime";
+        const evaluation = input.topicPlan
+          ? evaluateTopicPlanRelevance(result.title, result.snippet, input.topicPlan)
+          : null;
+        const fallbackMatchedTerms = queryTerms.scoringTerms.filter((term) =>
+          `${result.title}\n${result.snippet}`
+            .toLocaleLowerCase()
+            .includes(term.toLocaleLowerCase())
+        );
+
+        log.debug("wxrank", "retained result", {
+          rank: index + 1,
+          origin,
+          title: logText(result.title),
+          matchedTerms: evaluation?.matchedTerms ?? fallbackMatchedTerms,
+          score: evaluation?.score ?? fallbackMatchedTerms.length,
+          reasons: evaluation?.reasons ?? [
+            origin === "history" ? "历史库相关性排序入选" : "实时搜索结果入选",
+          ],
+        });
       });
 
       emitProgress(onProgress, results);

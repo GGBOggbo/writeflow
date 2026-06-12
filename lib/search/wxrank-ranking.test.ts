@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWxrankQueryTerms,
+  evaluateTopicPlanRelevance,
   filterAndRankHistoricalArticles,
   type WxrankHistoricalArticle,
 } from "./wxrank-ranking";
@@ -91,6 +92,34 @@ describe("filterAndRankHistoricalArticles", () => {
     relatedTerms: ["职场", "普通员工", "岗位转型"],
     excludedTerms: ["军事", "国际政治", "手机广告"],
   };
+
+  it("explains why an exact topic-plan match is retained", () => {
+    expect(
+      evaluateTopicPlanRelevance(
+        "GPT-5.6 如何改变普通职场人",
+        "讨论岗位转型和工作效率",
+        gptPlan
+      )
+    ).toMatchObject({
+      retained: true,
+      matchedTerms: ["GPT-5.6", "GPT", "职场", "岗位转型"],
+      reasons: ["命中精确核心词", "命中相关场景"],
+    });
+  });
+
+  it("explains why an excluded direction is rejected", () => {
+    expect(
+      evaluateTopicPlanRelevance(
+        "军事观察：两场对决改变世界",
+        "正文顺带提到 GPT，但主题是国际政治",
+        gptPlan
+      )
+    ).toMatchObject({
+      retained: false,
+      matchedTerms: ["GPT", "军事", "国际政治"],
+      rejectionReason: "命中排除方向",
+    });
+  });
 
   it("keeps exact entities and rejects broad off-topic mentions", () => {
     const results = filterAndRankHistoricalArticles(
