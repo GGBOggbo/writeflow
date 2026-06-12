@@ -22,6 +22,7 @@ import { selectDeepDiveArticles } from "./jizhila-selection";
 import {
   buildWxrankQueryTerms,
   filterAndRankHistoricalArticles,
+  isRelevantToTopicPlan,
 } from "./wxrank-ranking";
 import type { WxrankHistoricalArticle as RankedHistoricalArticle } from "./wxrank-ranking";
 
@@ -437,7 +438,16 @@ export function createWxrankSearchProvider(
     async search(input: SearchQueryInput, onProgress?: ProgressReporter) {
       const client = options.client ?? createWxrankClient();
       const now = options.now?.() ?? new Date();
-      const queryTerms = buildWxrankQueryTerms(input.query);
+      const queryTerms = input.topicPlan
+        ? {
+            historyKeyword: input.topicPlan.historyKeyword,
+            realtimeKeyword: input.topicPlan.realtimeKeyword,
+            scoringTerms: [
+              ...input.topicPlan.requiredTerms,
+              ...input.topicPlan.relatedTerms,
+            ],
+          }
+        : buildWxrankQueryTerms(input.query);
       const currentMonth = toMonthKey(now);
       const previousMonthKey = toMonthKey(previousMonth(now));
       const allHistoricalRaw: WxrankClientHistoricalArticle[] = [];
@@ -469,7 +479,7 @@ export function createWxrankSearchProvider(
 
       let rankedHistory = filterAndRankHistoricalArticles(
         allHistoricalRaw.map(toRankedHistoricalArticle),
-        queryTerms.scoringTerms,
+        input.topicPlan ?? queryTerms.scoringTerms,
         now
       );
 
@@ -490,7 +500,7 @@ export function createWxrankSearchProvider(
 
         rankedHistory = filterAndRankHistoricalArticles(
           allHistoricalRaw.map(toRankedHistoricalArticle),
-          queryTerms.scoringTerms,
+          input.topicPlan ?? queryTerms.scoringTerms,
           now
         );
       }
@@ -506,9 +516,20 @@ export function createWxrankSearchProvider(
             keyword: queryTerms.realtimeKeyword || input.query,
             sortType: 4,
           });
+          const realtimeResults = realtime
+            .map(mapRealtimeResult)
+            .filter(
+              (result) =>
+                !input.topicPlan ||
+                isRelevantToTopicPlan(
+                  result.title,
+                  result.snippet,
+                  input.topicPlan
+                )
+            );
           results = dedupeByUrl([
             ...results,
-            ...realtime.map(mapRealtimeResult),
+            ...realtimeResults,
           ]).slice(0, RESULT_LIMIT);
         } catch {
           if (results.length === 0) {

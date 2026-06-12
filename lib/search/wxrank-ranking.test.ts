@@ -4,6 +4,7 @@ import {
   filterAndRankHistoricalArticles,
   type WxrankHistoricalArticle,
 } from "./wxrank-ranking";
+import type { TopicSearchPlan } from "./topic-search-plan";
 
 function article(
   title: string,
@@ -82,6 +83,65 @@ describe("buildWxrankQueryTerms", () => {
 
 describe("filterAndRankHistoricalArticles", () => {
   const now = new Date("2026-06-12T00:00:00+08:00");
+  const gptPlan: TopicSearchPlan = {
+    coreTopic: "GPT-5.6 对普通职场人的影响",
+    historyKeyword: "GPT 职场",
+    realtimeKeyword: "GPT-5.6 普通员工 职场转型",
+    requiredTerms: ["GPT-5.6", "GPT"],
+    relatedTerms: ["职场", "普通员工", "岗位转型"],
+    excludedTerms: ["军事", "国际政治", "手机广告"],
+  };
+
+  it("keeps exact entities and rejects broad off-topic mentions", () => {
+    const results = filterAndRankHistoricalArticles(
+      [
+        article(
+          "GPT-5.6 如何改变普通职场人",
+          "讨论岗位转型和工作效率",
+          "2026-06-11 10:00:00",
+          20_000
+        ),
+        article(
+          "军事观察：两场对决改变世界",
+          "正文顺带提到 GPT，但主题是国际政治",
+          "2026-06-11 09:00:00",
+          100_000
+        ),
+        article(
+          "GPT 正在改变普通员工的工作方式",
+          "职场岗位转型正在发生",
+          "2026-06-11 08:00:00",
+          10_000
+        ),
+      ],
+      gptPlan,
+      now
+    );
+
+    expect(results.map((item) => item.title)).toEqual([
+      "GPT-5.6 如何改变普通职场人",
+      "GPT 正在改变普通员工的工作方式",
+    ]);
+  });
+
+  it("does not reject a relevant result when an excluded term is incidental", () => {
+    const results = filterAndRankHistoricalArticles(
+      [
+        article(
+          "GPT-5.6 职场转型指南",
+          "文章用军事推演作了一句类比，主体仍是普通员工转型。",
+          "2026-06-11 10:00:00",
+          20_000
+        ),
+      ],
+      gptPlan,
+      now
+    );
+
+    expect(results.map((item) => item.title)).toEqual([
+      "GPT-5.6 职场转型指南",
+    ]);
+  });
 
   it("keeps weak entity matches but ranks strongly relevant articles above them", () => {
     const results = filterAndRankHistoricalArticles(

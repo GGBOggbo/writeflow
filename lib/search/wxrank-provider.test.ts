@@ -20,6 +20,20 @@ function baseInput(query = "Claude神话模型 痛点"): SearchQueryInput {
   };
 }
 
+function plannedGptInput(): SearchQueryInput {
+  return {
+    ...baseInput("GPT-5.6"),
+    topicPlan: {
+      coreTopic: "GPT-5.6 对普通职场人的影响",
+      historyKeyword: "GPT 职场",
+      realtimeKeyword: "GPT-5.6 普通员工 职场转型",
+      requiredTerms: ["GPT-5.6", "GPT"],
+      relatedTerms: ["职场", "普通员工", "岗位转型"],
+      excludedTerms: ["军事", "国际政治", "手机广告"],
+    },
+  };
+}
+
 function article(
   index: number,
   overrides: Partial<{
@@ -180,6 +194,43 @@ afterEach(() => {
 });
 
 describe("wxrank search provider", () => {
+  it("uses planned keywords and filters realtime results with the same gate", async () => {
+    const { client, calls } = createFakeClient({
+      history: [[], []],
+      realtime: [
+        realtimeArticle(1, {
+          title: "军事观察：两场对决改变世界",
+          desc: "正文顺带提到 GPT，但主题是国际政治。",
+        }),
+        realtimeArticle(2, {
+          title: "GPT-5.6 如何改变普通职场人",
+          desc: "普通员工需要重新规划岗位转型。",
+        }),
+      ],
+      articleInfo: [
+        articleInfo(1, {
+          title: "GPT-5.6 如何改变普通职场人",
+          text: "普通员工需要重新规划岗位转型。",
+          html: "<p>普通员工需要重新规划岗位转型。</p>",
+        }),
+      ],
+    });
+
+    const results = await createProvider(client).search(plannedGptInput());
+
+    expect(calls.filter((call) => call.endpoint === "artlist").map((call) => call.input))
+      .toMatchObject([
+        { keyword: "GPT 职场" },
+        { keyword: "GPT 职场" },
+      ]);
+    expect(calls.find((call) => call.endpoint === "getso")?.input).toMatchObject({
+      keyword: "GPT-5.6 普通员工 职场转型",
+    });
+    expect(results.map((result) => result.title)).toEqual([
+      "GPT-5.6 如何改变普通职场人",
+    ]);
+  });
+
   it("uses current-month history only when it has at least five qualified articles", async () => {
     const { client, calls } = createFakeClient({
       history: [

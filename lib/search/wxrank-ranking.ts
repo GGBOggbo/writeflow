@@ -1,3 +1,5 @@
+import type { TopicSearchPlan } from "./topic-search-plan";
+
 const WXRANK_STOP_WORDS = new Set([
   "痛点",
   "现状",
@@ -242,6 +244,52 @@ function countTermMatches(text: string, terms: string[]) {
   return terms.filter((term) => termMatches(text, term)).length;
 }
 
+function isPreciseEntity(term: string) {
+  return /[0-9.\-]/.test(term) || /\s/.test(term);
+}
+
+function normalizedPlanTerms(terms: string[]) {
+  return uniqueTerms(terms.map((term) => term.trim()).filter(Boolean));
+}
+
+export function isRelevantToTopicPlan(
+  title: string,
+  content: string,
+  plan: TopicSearchPlan
+) {
+  const requiredTerms = normalizedPlanTerms(plan.requiredTerms);
+  if (requiredTerms.length === 0) return false;
+
+  const preciseTerms = requiredTerms.filter(isPreciseEntity);
+  const broadTerms = requiredTerms.filter((term) => !isPreciseEntity(term));
+  const relatedTerms = normalizedPlanTerms(plan.relatedTerms);
+  const excludedTerms = normalizedPlanTerms(plan.excludedTerms);
+  const searchableText = `${title}\n${content}`;
+  const preciseTitleMatch = preciseTerms.some((term) => termMatches(title, term));
+  const preciseMatch = preciseTerms.some((term) => termMatches(searchableText, term));
+  const broadTitleMatch = broadTerms.some((term) => termMatches(title, term));
+  const broadMatch = broadTerms.some((term) => termMatches(searchableText, term));
+  const excludedTitleMatch = excludedTerms.some((term) => termMatches(title, term));
+
+  if (excludedTitleMatch && !preciseTitleMatch) {
+    return false;
+  }
+
+  if (preciseMatch) {
+    return true;
+  }
+
+  if (!broadMatch) {
+    return false;
+  }
+
+  if (relatedTerms.length === 0) {
+    return broadTitleMatch;
+  }
+
+  return relatedTerms.some((term) => termMatches(searchableText, term));
+}
+
 function engagementScore(article: WxrankHistoricalArticle) {
   return (
     Math.max(0, article.readCount) +
@@ -253,10 +301,15 @@ function engagementScore(article: WxrankHistoricalArticle) {
 
 export function filterAndRankHistoricalArticles(
   articles: WxrankHistoricalArticle[],
-  scoringTerms: string[],
+  scoringTermsOrPlan: string[] | TopicSearchPlan,
   now: Date
 ): WxrankHistoricalArticle[] {
-  const terms = uniqueTerms(scoringTerms.map((term) => term.trim()).filter(Boolean));
+  const plan = Array.isArray(scoringTermsOrPlan) ? undefined : scoringTermsOrPlan;
+  const terms = normalizedPlanTerms(
+    plan
+      ? [...plan.requiredTerms, ...plan.relatedTerms]
+      : scoringTermsOrPlan
+  );
   if (terms.length === 0 || !Number.isFinite(now.getTime())) {
     return [];
   }
@@ -281,7 +334,11 @@ export function filterAndRankHistoricalArticles(
     }
 
     const searchableText = `${title}\n${article.content}`;
-    if (!termMatches(searchableText, entityTerm)) {
+    if (
+      plan
+        ? !isRelevantToTopicPlan(title, article.content, plan)
+        : !termMatches(searchableText, entityTerm)
+    ) {
       continue;
     }
 
