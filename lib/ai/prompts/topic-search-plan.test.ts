@@ -15,6 +15,7 @@ describe("buildTopicSearchPlanPrompt", () => {
     expect(prompt.userPrompt).toContain("requiredTerms");
     expect(prompt.userPrompt).toContain("excludedTerms");
     expect(prompt.userPrompt).toContain("最多 5 个");
+    expect(prompt.userPrompt).toContain("禁止在关键词中添加用户未提及的年份");
   });
 });
 

@@ -65,6 +65,45 @@ function addedNumericTerms(input: string, plan: TopicSearchPlan) {
     .filter((term) => !inputTerms.has(term));
 }
 
+function stripTerms(value: string, terms: string[]) {
+  return terms
+    .reduce(
+      (text, term) =>
+        text.replace(new RegExp(`(?:^|\\s)${term}(?=\\s|$)`, "g"), " "),
+      value
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeAddedNumericTerms(
+  plan: TopicSearchPlan,
+  idea: string,
+  terms: string[]
+): TopicSearchPlan {
+  if (terms.length === 0) {
+    return plan;
+  }
+
+  const fallback = buildFallbackTopicSearchPlan(idea);
+  const historyKeyword = stripTerms(plan.historyKeyword, terms) || fallback.historyKeyword;
+  const realtimeKeyword = stripTerms(plan.realtimeKeyword, terms) || fallback.realtimeKeyword;
+  const requiredTerms = plan.requiredTerms
+    .map((term) => stripTerms(term, terms))
+    .filter(Boolean);
+  const relatedTerms = plan.relatedTerms
+    .map((term) => stripTerms(term, terms))
+    .filter(Boolean);
+
+  return topicSearchPlanSchema.parse({
+    ...plan,
+    historyKeyword,
+    realtimeKeyword,
+    requiredTerms: requiredTerms.length > 0 ? requiredTerms : fallback.requiredTerms,
+    relatedTerms,
+  });
+}
+
 function topicReferenceStats(searchContext: SearchReferenceBundle | null) {
   const results = searchContext?.results ?? [];
   const promptResults = results.slice(0, 4);
@@ -251,6 +290,8 @@ export async function generateTopics(
       });
     }
     plannerMs = Date.now() - plannerStartedAt;
+    const addedTerms = addedNumericTerms(input.idea, topicPlan);
+    topicPlan = sanitizeAddedNumericTerms(topicPlan, input.idea, addedTerms);
 
     log.debug("topics", "search plan", {
       event: "search.plan.completed",
@@ -262,7 +303,8 @@ export async function generateTopics(
       requiredTerms: topicPlan.requiredTerms.map((term) => logPreview(term, 80)),
       relatedTerms: topicPlan.relatedTerms.map((term) => logPreview(term, 80)),
       excludedTerms: topicPlan.excludedTerms.map((term) => logPreview(term, 80)),
-      addedTerms: addedNumericTerms(input.idea, topicPlan),
+      addedTerms,
+      sanitizedTerms: addedTerms,
     });
 
     options?.onProgress?.({

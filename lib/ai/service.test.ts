@@ -90,7 +90,7 @@ describe("AI service", () => {
       relatedTerms: ["神话模型"],
       excludedTerms: [],
     });
-    vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce({
+    const searchSpy = vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce({
       status: "success",
       query: "Claude 神话模型 2025",
       intent: "topics",
@@ -124,6 +124,17 @@ describe("AI service", () => {
       searchMode: "default",
     });
 
+    expect(searchSpy).toHaveBeenCalledWith(
+      "Claude神话模型",
+      "default",
+      undefined,
+      expect.objectContaining({
+        historyKeyword: "Claude",
+        realtimeKeyword: "Claude 神话模型",
+        requiredTerms: ["Claude"],
+        relatedTerms: ["神话模型"],
+      })
+    );
     const logs = capture.output();
     capture.restore();
     expect(logs).toContain('"scope":"topics"');
@@ -132,6 +143,8 @@ describe("AI service", () => {
     expect(logs).toContain('"event":"search.plan.completed"');
     expect(logs).toContain('"source":"ai"');
     expect(logs).toContain('"addedTerms":["2025"]');
+    expect(logs).toContain('"sanitizedTerms":["2025"]');
+    expect(logs).toContain('"realtimeKeyword":"Claude 神话模型"');
     expect(logs).toContain('"event":"search.context.prepared"');
     expect(logs).toContain('"searchResults":2');
     expect(logs).toContain('"history":1');
@@ -187,6 +200,47 @@ describe("AI service", () => {
     expect(logs).toContain('"event":"search.plan.fallback"');
     expect(logs).toContain('"source":"fallback"');
     expect(logs).toContain('"errorType":"Error"');
+  });
+
+  it("keeps a valid fallback keyword when the AI plan only adds an unrequested year", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.spyOn(mockAIProvider, "planTopicSearch").mockResolvedValueOnce({
+      coreTopic: "Claude 神话模型",
+      historyKeyword: "2025",
+      realtimeKeyword: "2025",
+      requiredTerms: ["2025"],
+      relatedTerms: ["2025"],
+      excludedTerms: [],
+    });
+    const searchSpy = vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce({
+      status: "empty",
+      query: "Claude神话模型",
+      intent: "topics",
+      freshness: "pastMonth",
+      results: [],
+      seoKeywords: [],
+      crowdedness: "low",
+      staleBuzzwords: [],
+      notes: [],
+    });
+
+    await generateTopics({
+      idea: "Claude神话模型",
+      searchEnabled: true,
+      searchMode: "default",
+    });
+
+    expect(searchSpy).toHaveBeenCalledWith(
+      "Claude神话模型",
+      "default",
+      undefined,
+      expect.objectContaining({
+        historyKeyword: "Claude神话模型",
+        realtimeKeyword: "Claude神话模型",
+        requiredTerms: ["Claude神话模型"],
+        relatedTerms: [],
+      })
+    );
   });
 
   it("throws a clear error for unsupported providers", async () => {

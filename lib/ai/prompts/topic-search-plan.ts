@@ -16,6 +16,7 @@ ${idea}
 6. relatedTerms：用于提高相关性排序的场景词、对象词或问题词，最多 10 个。
 7. excludedTerms：只填写与本次主命题高置信度冲突的方向，最多 5 个；不确定时返回空数组。不要生成泛化黑名单。
 8. 不得补造用户没有表达的身份、事实或立场。
+9. 禁止在关键词中添加用户未提及的年份。如果原始想法没有写 2025、2026 等具体年份，historyKeyword、realtimeKeyword、requiredTerms 和 relatedTerms 都不要补年份。
 
 只规划搜索，不要生成文章标题、选题建议或解释。输出字段必须为 coreTopic、historyKeyword、realtimeKeyword、requiredTerms、relatedTerms、excludedTerms。`,
   };
