@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WxrankClient } from "./wxrank-client";
 import { WxrankBusinessError, WxrankRequestError } from "./wxrank-client";
 import {
@@ -71,12 +71,55 @@ function realtimeArticle(
   };
 }
 
+function articleInfo(
+  index: number,
+  overrides: Partial<{
+    article_url: string;
+    title: string;
+    html: string;
+    text: string;
+    pub_time: string;
+    comment_id: string | number;
+  }> = {}
+) {
+  return {
+    article_url:
+      overrides.article_url ?? `https://mp.weixin.qq.com/s/canonical-${index}`,
+    title: overrides.title ?? `Claude 神话模型深拆 ${index}`,
+    html: overrides.html ?? `<p>Claude 神话模型深拆正文 ${index}</p>`,
+    text: overrides.text ?? `Claude 神话模型深拆正文 ${index}`,
+    pub_time: overrides.pub_time ?? "2026-06-11 10:00:00",
+    comment_id: overrides.comment_id,
+  };
+}
+
+function comment(
+  index: number,
+  overrides: Partial<{
+    content: string;
+    like_num: number;
+    create_time: string;
+    is_top: number;
+  }> = {}
+) {
+  return {
+    content: overrides.content ?? `评论 ${index}`,
+    like_num: overrides.like_num ?? index,
+    create_time: overrides.create_time ?? `2026-06-11 10:0${index}:00`,
+    is_top: overrides.is_top,
+  };
+}
+
 function createFakeClient(options: {
   history?: Array<unknown | Error>;
   realtime?: unknown | Error;
+  articleInfo?: Array<unknown | Error>;
+  comments?: Array<unknown | Error>;
 }) {
   const calls: Array<{ endpoint: string; input: unknown }> = [];
   const historyResponses = [...(options.history ?? [])];
+  const articleInfoResponses = [...(options.articleInfo ?? [])];
+  const commentResponses = [...(options.comments ?? [])];
 
   const client: WxrankClient = {
     async listHotArticles(input) {
@@ -94,11 +137,24 @@ function createFakeClient(options: {
       }
       return (options.realtime as ReturnType<typeof realtimeArticle>[] | undefined) ?? [];
     },
-    async getArticleInfo() {
-      throw new Error("Task 3 must not call artinfo");
+    async getArticleInfo(input) {
+      calls.push({ endpoint: "artinfo", input });
+      const response = articleInfoResponses.shift();
+      if (response instanceof Error) {
+        throw response;
+      }
+      return (
+        (response as ReturnType<typeof articleInfo> | undefined) ??
+        articleInfo(1, { article_url: input })
+      );
     },
-    async getArticleComments() {
-      throw new Error("Task 3 must not call getcm");
+    async getArticleComments(input) {
+      calls.push({ endpoint: "getcm", input });
+      const response = commentResponses.shift();
+      if (response instanceof Error) {
+        throw response;
+      }
+      return (response as ReturnType<typeof comment>[] | undefined) ?? [];
     },
   };
 
@@ -112,6 +168,16 @@ function createProvider(client: WxrankClient) {
 function createProviderAt(client: WxrankClient, now: Date) {
   return createWxrankSearchProvider({ client, now: () => now });
 }
+
+function searchEndpoints(calls: Array<{ endpoint: string }>) {
+  return calls
+    .map((call) => call.endpoint)
+    .filter((endpoint) => endpoint === "artlist" || endpoint === "getso");
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("wxrank search provider", () => {
   it("uses current-month history only when it has at least five qualified articles", async () => {
@@ -139,7 +205,7 @@ describe("wxrank search provider", () => {
       progress.push(event)
     );
 
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist"]);
+    expect(searchEndpoints(calls)).toEqual(["artlist"]);
     expect(calls[0]?.input).toMatchObject({
       month: "202606",
       keyword: "Claude",
@@ -165,6 +231,8 @@ describe("wxrank search provider", () => {
       ["results_normalized", "筛选素材"],
       ["engagement_enrichment_started", "甄别热度"],
       ["engagement_enrichment_completed", "甄别热度完成"],
+      ["deep_dive_started", "拆解标杆"],
+      ["deep_dive_completed", "拆解标杆完成"],
     ]);
     expect(progress.find((event) => event.stepId === "engagement_enrichment_started")?.detail)
       .toBe("选用 5 篇 wxrank 历史库已有互动数据");
@@ -189,7 +257,7 @@ describe("wxrank search provider", () => {
     ).search(baseInput());
 
     expect(calls[0]?.input).toMatchObject({ month: "202601" });
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist"]);
+    expect(searchEndpoints(calls)).toEqual(["artlist"]);
   });
 
   it("queries previous-month history when current month is insufficient and avoids realtime once history reaches five", async () => {
@@ -215,8 +283,9 @@ describe("wxrank search provider", () => {
 
     const results = await createProvider(client).search(baseInput());
 
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist", "artlist"]);
-    expect(calls.map((call) => call.input)).toMatchObject([
+    expect(searchEndpoints(calls)).toEqual(["artlist", "artlist"]);
+    expect(calls.filter((call) => call.endpoint === "artlist").map((call) => call.input))
+      .toMatchObject([
       { month: "202606", keyword: "Claude" },
       { month: "202605", keyword: "Claude" },
     ]);
@@ -244,7 +313,7 @@ describe("wxrank search provider", () => {
 
     const results = await createProvider(client).search(baseInput());
 
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist", "artlist", "getso"]);
+    expect(searchEndpoints(calls)).toEqual(["artlist", "artlist", "getso"]);
     expect(calls[2]?.input).toMatchObject({
       keyword: "Claude神话模型",
       sortType: 4,
@@ -264,7 +333,6 @@ describe("wxrank search provider", () => {
 
     await createProvider(client).search(baseInput(), (event) => progress.push(event));
 
-    expect(progress.map((event) => event.stepId)).not.toContain("deep_dive_started");
     expect(progress.find((event) => event.stepId === "engagement_enrichment_started")?.detail)
       .toBe("实时搜索结果暂无阅读互动数据");
   });
@@ -281,7 +349,7 @@ describe("wxrank search provider", () => {
 
     const results = await createProvider(client).search(baseInput());
 
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist", "artlist"]);
+    expect(searchEndpoints(calls)).toEqual(["artlist", "artlist"]);
     expect(results).toHaveLength(5);
   });
 
@@ -296,7 +364,7 @@ describe("wxrank search provider", () => {
 
     const results = await createProvider(client).search(baseInput());
 
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist", "artlist", "getso"]);
+    expect(searchEndpoints(calls)).toEqual(["artlist", "artlist", "getso"]);
     expect(results).toHaveLength(2);
   });
 
@@ -307,7 +375,7 @@ describe("wxrank search provider", () => {
     });
 
     await expect(createProvider(client).search(baseInput())).rejects.toThrow(WxrankProviderError);
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist"]);
+    expect(searchEndpoints(calls)).toEqual(["artlist"]);
   });
 
   it("returns nonempty history when realtime fallback fails", async () => {
@@ -318,7 +386,7 @@ describe("wxrank search provider", () => {
 
     const results = await createProvider(client).search(baseInput());
 
-    expect(calls.map((call) => call.endpoint)).toEqual(["artlist", "artlist", "getso"]);
+    expect(searchEndpoints(calls)).toEqual(["artlist", "artlist", "getso"]);
     expect(results).toHaveLength(3);
   });
 
@@ -339,5 +407,210 @@ describe("wxrank search provider", () => {
       expect(String(error)).not.toContain("test-key");
       expect(String(error)).not.toContain("body");
     }
+  });
+
+  it("deep-dives exactly two selected articles with html and comments", async () => {
+    const { client, calls } = createFakeClient({
+      history: [Array.from({ length: 8 }, (_, index) => article(index + 1))],
+      articleInfo: [
+        articleInfo(1, {
+          article_url: "https://mp.weixin.qq.com/s/canonical-one",
+          comment_id: "comment-one",
+        }),
+        articleInfo(2, {
+          article_url: "https://mp.weixin.qq.com/s/canonical-two",
+          comment_id: "comment-two",
+        }),
+      ],
+      comments: [
+        [
+          comment(1, { content: "<p>普通评论</p>", like_num: 500 }),
+          comment(2, { content: "置顶评论", like_num: 1, is_top: 1 }),
+          comment(3, { content: "高赞评论", like_num: 900 }),
+        ],
+        [comment(4, { content: "第二篇评论", like_num: 300 })],
+      ],
+    });
+    const progress: WorkflowProgressEvent[] = [];
+
+    const results = await createProvider(client).search(baseInput(), (event) =>
+      progress.push(event)
+    );
+
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(2);
+    expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(2);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(2);
+    expect(results.filter((result) => result.comments?.length)).toHaveLength(2);
+    expect(results.some((result) => result.url === "https://mp.weixin.qq.com/s/canonical-one"))
+      .toBe(true);
+    expect(results.find((result) => result.url === "https://mp.weixin.qq.com/s/canonical-one")
+      ?.comments?.map((item) => item.content)).toEqual([
+        "置顶评论",
+        "高赞评论",
+        "普通评论",
+      ]);
+    expect(calls.filter((call) => call.endpoint === "getcm").map((call) => call.input))
+      .toEqual([
+        {
+          url: "https://mp.weixin.qq.com/s/canonical-one",
+          commentId: "comment-one",
+        },
+        {
+          url: "https://mp.weixin.qq.com/s/canonical-two",
+          commentId: "comment-two",
+        },
+      ]);
+    expect(progress.map((event) => event.stepId)).toContain("deep_dive_started");
+    expect(progress.map((event) => event.stepId)).toContain("deep_dive_completed");
+  });
+
+  it("skips comment enrichment when article info has no comment id", async () => {
+    const { client, calls } = createFakeClient({
+      history: [Array.from({ length: 5 }, (_, index) => article(index + 1))],
+      articleInfo: [
+        articleInfo(1, { comment_id: undefined }),
+        articleInfo(2, { comment_id: undefined }),
+      ],
+    });
+
+    const results = await createProvider(client).search(baseInput());
+
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(2);
+    expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(0);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(2);
+  });
+
+  it("keeps base results when one artinfo call and one getcm call fail", async () => {
+    const { client, calls } = createFakeClient({
+      history: [Array.from({ length: 8 }, (_, index) => article(index + 1))],
+      articleInfo: [
+        new Error("artinfo failed"),
+        articleInfo(2, { comment_id: "comment-two" }),
+      ],
+      comments: [new Error("getcm failed")],
+    });
+
+    const results = await createProvider(client).search(baseInput());
+
+    expect(results).toHaveLength(8);
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(2);
+    expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(1);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(1);
+    expect(results.filter((result) => result.comments?.length)).toHaveLength(0);
+    expect(results.map((result) => result.title)).toContain("Claude 神话模型实测 1");
+  });
+
+  it("respects WXRANK_COMMENT_TOP_N when attaching comments", async () => {
+    vi.stubEnv("WXRANK_COMMENT_TOP_N", "2");
+    const { client } = createFakeClient({
+      history: [Array.from({ length: 5 }, (_, index) => article(index + 1))],
+      articleInfo: [
+        articleInfo(1, { comment_id: "comment-one" }),
+        articleInfo(2, { comment_id: "comment-two" }),
+      ],
+      comments: [
+        [
+          comment(1, { content: "低赞评论", like_num: 1 }),
+          comment(2, { content: "置顶评论", like_num: 0, is_top: 1 }),
+          comment(3, { content: "高赞评论", like_num: 100 }),
+        ],
+        [
+          comment(4, { content: "第二篇高赞", like_num: 80 }),
+          comment(5, { content: "第二篇低赞", like_num: 8 }),
+          comment(6, { content: "第二篇更低赞", like_num: 2 }),
+        ],
+      ],
+    });
+
+    const results = await createProvider(client).search(baseInput());
+
+    const commentSets = results
+      .filter((result) => result.comments?.length)
+      .map((result) => result.comments?.map((item) => item.content));
+    expect(commentSets).toEqual([
+      ["置顶评论", "高赞评论"],
+      ["第二篇高赞", "第二篇低赞"],
+    ]);
+  });
+
+  it("does not replace a result URL with an invalid article_url from artinfo", async () => {
+    const originalUrl = "https://mp.weixin.qq.com/s?__biz=biz1&mid=1&idx=1&sn=sn1";
+    const { client } = createFakeClient({
+      history: [
+        Array.from({ length: 5 }, (_, index) =>
+          article(index + 1, index === 0 ? { art_url: originalUrl } : {})
+        ),
+      ],
+      articleInfo: [
+        articleInfo(1, {
+          article_url: "https://mp.weixin.qq.com/s?scene=tracking-only",
+          comment_id: undefined,
+        }),
+        articleInfo(2, { comment_id: undefined }),
+      ],
+    });
+
+    const results = await createProvider(client).search(baseInput());
+
+    expect(results.some((result) => result.url === originalUrl)).toBe(true);
+    expect(results.some((result) => result.url === "https://mp.weixin.qq.com/s?scene=tracking-only"))
+      .toBe(false);
+  });
+
+  it("deduplicates results after artinfo canonical URLs converge", async () => {
+    const canonical = "https://mp.weixin.qq.com/s/canonical-same";
+    const { client } = createFakeClient({
+      history: [Array.from({ length: 5 }, (_, index) => article(index + 1))],
+      articleInfo: [
+        articleInfo(1, { article_url: `${canonical}?scene=1`, comment_id: undefined }),
+        articleInfo(2, { article_url: `${canonical}?scene=2`, comment_id: undefined }),
+      ],
+    });
+
+    const results = await createProvider(client).search(baseInput());
+
+    expect(results.filter((result) => result.url === canonical)).toHaveLength(1);
+    expect(new Set(results.map((result) => result.url)).size).toBe(results.length);
+  });
+
+  it("keeps enriched data when canonical URL collides with an earlier base result", async () => {
+    const earlierUrl = "https://mp.weixin.qq.com/s/canonical-earlier";
+    const { client } = createFakeClient({
+      history: [
+        [
+          article(1, {
+            art_url: earlierUrl,
+            read_num: 1,
+            like_num: 0,
+            look_num: 0,
+            share_num: 0,
+          }),
+          article(2, {
+            art_url: "https://mp.weixin.qq.com/s/deep-candidate",
+            read_num: 100_000,
+            like_num: 10_000,
+            look_num: 5_000,
+            share_num: 8_000,
+          }),
+          article(3),
+          article(4),
+          article(5),
+        ],
+      ],
+      articleInfo: [
+        articleInfo(1, {
+          article_url: earlierUrl,
+          html: "<p>已经付费拿到的正文</p>",
+          comment_id: undefined,
+        }),
+        articleInfo(2, { comment_id: undefined }),
+      ],
+    });
+
+    const results = await createProvider(client).search(baseInput());
+    const collided = results.find((result) => result.url === earlierUrl);
+
+    expect(results.filter((result) => result.url === earlierUrl)).toHaveLength(1);
+    expect(collided?.articleHtml).toBe("<p>已经付费拿到的正文</p>");
   });
 });

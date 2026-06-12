@@ -5,13 +5,20 @@ import {
   createWxrankClient,
 } from "./wxrank-client";
 import type {
+  WxrankArticleInfo,
   WxrankClient,
+  WxrankComment,
   WxrankHistoricalArticle as WxrankClientHistoricalArticle,
   WxrankSearchArticle,
 } from "./wxrank-client";
 import type { SearchProvider } from "./provider";
 import type { ProgressReporter } from "@/lib/progress/types";
-import type { SearchQueryInput, SearchResult } from "./types";
+import type {
+  SearchArticleComment,
+  SearchQueryInput,
+  SearchResult,
+} from "./types";
+import { selectDeepDiveArticles } from "./jizhila-selection";
 import {
   buildWxrankQueryTerms,
   filterAndRankHistoricalArticles,
@@ -20,6 +27,7 @@ import type { WxrankHistoricalArticle as RankedHistoricalArticle } from "./wxran
 
 const QUALIFIED_HISTORY_THRESHOLD = 5;
 const RESULT_LIMIT = 8;
+const DEEP_DIVE_LIMIT = 2;
 
 type WxrankSearchProviderOptions = {
   client?: WxrankClient;
@@ -135,6 +143,34 @@ function normalizeWechatUrl(value: string) {
   }
 }
 
+function isSafeWechatArticleUrl(value?: string) {
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    if (
+      (url.protocol !== "http:" && url.protocol !== "https:") ||
+      url.hostname.toLocaleLowerCase() !== "mp.weixin.qq.com"
+    ) {
+      return false;
+    }
+
+    if (/^\/s\/[^/]+$/.test(url.pathname)) {
+      return true;
+    }
+
+    if (url.pathname !== "/s") {
+      return false;
+    }
+
+    return ["__biz", "mid", "idx", "sn"].every((param) =>
+      Boolean(url.searchParams.get(param))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function historicalNotes(article: WxrankClientHistoricalArticle) {
   return [
     article.wx_type ? `公众号分类：${cleanText(article.wx_type)}` : "",
@@ -172,17 +208,40 @@ function mapRealtimeResult(article: WxrankSearchArticle): SearchResult {
 
 function dedupeByUrl(results: SearchResult[]) {
   const seen = new Set<string>();
+  const deduped: SearchResult[] = [];
 
-  return results.filter((result) => {
+  for (const result of results) {
     const key = normalizeWechatUrl(result.url);
-    if (!result.title || !key || seen.has(key)) {
-      return false;
+    if (!result.title || !key) {
+      continue;
     }
 
-    seen.add(key);
-    result.url = key;
-    return true;
-  });
+    const normalizedResult = { ...result, url: key };
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(normalizedResult);
+      continue;
+    }
+
+    const existingIndex = deduped.findIndex((item) => item.url === key);
+    const existing = existingIndex >= 0 ? deduped[existingIndex] : undefined;
+    if (existing && shouldPreferResult(normalizedResult, existing)) {
+      deduped[existingIndex] = normalizedResult;
+    }
+  }
+
+  return deduped;
+}
+
+function enrichmentScore(result: SearchResult) {
+  return (
+    (result.articleHtml ? 2 : 0) +
+    (result.comments && result.comments.length > 0 ? 1 : 0)
+  );
+}
+
+function shouldPreferResult(candidate: SearchResult, existing: SearchResult) {
+  return enrichmentScore(candidate) > enrichmentScore(existing);
 }
 
 function buildOriginalArticleMap(articles: WxrankClientHistoricalArticle[]) {
@@ -248,6 +307,127 @@ function emitProgress(
     stepId: "engagement_enrichment_completed",
     label: "甄别热度完成",
   });
+}
+
+function getPositiveEnvInt(name: string, fallback: number) {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function parseComment(item: WxrankComment): SearchArticleComment | null {
+  const content = cleanText(item.content);
+  if (!content) return null;
+
+  return {
+    content,
+    likeCount: typeof item.like_num === "number" ? item.like_num : undefined,
+    isTop:
+      "is_top" in item
+        ? item.is_top === 1 || item.is_top === true || item.is_top === "1"
+        : undefined,
+    createdAt: item.create_time,
+  };
+}
+
+function parseComments(comments: WxrankComment[]) {
+  const commentLimit = getPositiveEnvInt("WXRANK_COMMENT_TOP_N", 10);
+
+  return comments
+    .map(parseComment)
+    .filter((comment): comment is SearchArticleComment => Boolean(comment))
+    .sort((left, right) => {
+      if (left.isTop !== right.isTop) return left.isTop ? -1 : 1;
+      return (right.likeCount ?? 0) - (left.likeCount ?? 0);
+    })
+    .slice(0, commentLimit);
+}
+
+function applyArticleInfo(result: SearchResult, articleInfo: WxrankArticleInfo) {
+  const canonicalUrl = isSafeWechatArticleUrl(articleInfo.article_url)
+    ? normalizeWechatUrl(articleInfo.article_url)
+    : result.url;
+
+  return {
+    ...result,
+    url: canonicalUrl,
+    articleHtml: articleInfo.html,
+  };
+}
+
+async function enrichOneDeepDiveArticle(
+  client: WxrankClient,
+  result: SearchResult
+): Promise<{ originalUrl: string; result: SearchResult }> {
+  const originalUrl = result.url;
+
+  try {
+    const articleInfo = await client.getArticleInfo(result.url);
+    let enriched = applyArticleInfo(result, articleInfo);
+    const commentId = articleInfo.comment_id?.toString().trim();
+
+    if (commentId) {
+      try {
+        const comments = parseComments(
+          await client.getArticleComments({
+            url: enriched.url,
+            commentId,
+          })
+        );
+        if (comments.length > 0) {
+          enriched = {
+            ...enriched,
+            comments,
+          };
+        }
+      } catch {
+        return { originalUrl, result: enriched };
+      }
+    }
+
+    return { originalUrl, result: enriched };
+  } catch {
+    return { originalUrl, result };
+  }
+}
+
+function replaceEnrichedResults(
+  results: SearchResult[],
+  replacements: Array<{ originalUrl: string; result: SearchResult }>
+) {
+  const replacementByOriginalUrl = new Map(
+    replacements.map((item) => [item.originalUrl, item.result])
+  );
+
+  return results.map((result) => replacementByOriginalUrl.get(result.url) ?? result);
+}
+
+async function enrichDeepDiveArticles(
+  client: WxrankClient,
+  results: SearchResult[],
+  onProgress?: ProgressReporter
+) {
+  const candidates = selectDeepDiveArticles(results, DEEP_DIVE_LIMIT);
+  if (candidates.length === 0) {
+    return results;
+  }
+
+  onProgress?.({
+    stepId: "deep_dive_started",
+    label: "拆解标杆",
+    detail: `深拆 ${candidates.length} 篇标杆文章`,
+  });
+
+  const replacements = [];
+  for (const candidate of candidates) {
+    replacements.push(await enrichOneDeepDiveArticle(client, candidate));
+  }
+
+  onProgress?.({
+    stepId: "deep_dive_completed",
+    label: "拆解标杆完成",
+  });
+
+  return dedupeByUrl(replaceEnrichedResults(results, replacements));
 }
 
 export function createWxrankSearchProvider(
@@ -343,7 +523,7 @@ export function createWxrankSearchProvider(
       }
 
       emitProgress(onProgress, results);
-      return results;
+      return enrichDeepDiveArticles(client, results, onProgress);
     },
   };
 }
