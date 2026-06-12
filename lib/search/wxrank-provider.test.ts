@@ -191,10 +191,13 @@ function searchEndpoints(calls: Array<{ endpoint: string }>) {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 describe("wxrank search provider", () => {
   it("uses planned keywords and filters realtime results with the same gate", async () => {
+    vi.stubEnv("LOG_LEVEL", "info");
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const { client, calls } = createFakeClient({
       history: [[], []],
       realtime: [
@@ -229,9 +232,20 @@ describe("wxrank search provider", () => {
     expect(results.map((result) => result.title)).toEqual([
       "GPT-5.6 如何改变普通职场人",
     ]);
+    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(logs).toContain("[wxrank] → artlist");
+    expect(logs).toContain('"month":"202606"');
+    expect(logs).toContain('"raw":0');
+    expect(logs).toContain("[wxrank] → getso");
+    expect(logs).toContain('"raw":2');
+    expect(logs).toContain('"qualified":1');
+    expect(logs).toContain("route=realtime-fallback");
+    expect(logs).not.toContain("apiKey");
   });
 
   it("uses current-month history only when it has at least five qualified articles", async () => {
+    vi.stubEnv("LOG_LEVEL", "info");
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const { client, calls } = createFakeClient({
       history: [
         [
@@ -287,6 +301,12 @@ describe("wxrank search provider", () => {
     ]);
     expect(progress.find((event) => event.stepId === "engagement_enrichment_started")?.detail)
       .toBe("选用 5 篇 wxrank 历史库已有互动数据");
+    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(logs).toContain("[wxrank] → artlist");
+    expect(logs).toContain('"raw":5');
+    expect(logs).toContain('"qualified":5');
+    expect(logs).toContain("route=history-only");
+    expect(logs).not.toContain("getso");
   });
 
   it("calculates current and previous months in China time across the year boundary", async () => {

@@ -13,6 +13,7 @@ import type {
 } from "./wxrank-client";
 import type { SearchProvider } from "./provider";
 import type { ProgressReporter } from "@/lib/progress/types";
+import { log } from "@/lib/debug";
 import type {
   SearchArticleComment,
   SearchQueryInput,
@@ -29,6 +30,10 @@ import type { WxrankHistoricalArticle as RankedHistoricalArticle } from "./wxran
 const QUALIFIED_HISTORY_THRESHOLD = 5;
 const RESULT_LIMIT = 8;
 const DEEP_DIVE_LIMIT = 2;
+
+function logKeyword(value: string) {
+  return value.replace(/[\n\r\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+}
 
 type WxrankSearchProviderOptions = {
   client?: WxrankClient;
@@ -263,6 +268,11 @@ async function fetchHistoricalMonth(
       throw error;
     }
 
+    log.warn("wxrank", "artlist failed; continuing route", {
+      month,
+      keyword: logKeyword(keyword),
+      reason: error instanceof Error ? error.message : "unknown error",
+    });
     return null;
   }
 }
@@ -451,6 +461,11 @@ export function createWxrankSearchProvider(
       const currentMonth = toMonthKey(now);
       const previousMonthKey = toMonthKey(previousMonth(now));
       const allHistoricalRaw: WxrankClientHistoricalArticle[] = [];
+      let previousMonthRequested = false;
+      let realtimeRequested = false;
+      let realtimeQualified = 0;
+
+      log.debug("wxrank", "topic search plan", input.topicPlan ?? queryTerms);
 
       onProgress?.({
         stepId: "search_query_built",
@@ -465,17 +480,39 @@ export function createWxrankSearchProvider(
 
       let currentHistory: WxrankClientHistoricalArticle[] | null;
       try {
+        log.info("wxrank", "artlist", {
+          month: currentMonth,
+          keyword: logKeyword(queryTerms.historyKeyword),
+        });
         currentHistory = await fetchHistoricalMonth(
           client,
           currentMonth,
           queryTerms.historyKeyword
         );
-      } catch {
+      } catch (error) {
+        log.warn("wxrank", "artlist failed; stopping route", {
+          month: currentMonth,
+          keyword: logKeyword(queryTerms.historyKeyword),
+          reason: error instanceof Error ? error.message : "unknown error",
+        });
         throw new WxrankProviderError();
       }
       if (currentHistory) {
         allHistoricalRaw.push(...currentHistory);
       }
+
+      const currentQualified = currentHistory
+        ? filterAndRankHistoricalArticles(
+            currentHistory.map(toRankedHistoricalArticle),
+            input.topicPlan ?? queryTerms.scoringTerms,
+            now
+          ).length
+        : 0;
+      log.info("wxrank", "artlist completed", {
+        month: currentMonth,
+        raw: currentHistory?.length ?? 0,
+        qualified: currentQualified,
+      });
 
       let rankedHistory = filterAndRankHistoricalArticles(
         allHistoricalRaw.map(toRankedHistoricalArticle),
@@ -484,19 +521,42 @@ export function createWxrankSearchProvider(
       );
 
       if (rankedHistory.length < QUALIFIED_HISTORY_THRESHOLD) {
+        previousMonthRequested = true;
         let previousHistory: WxrankClientHistoricalArticle[] | null;
         try {
+          log.info("wxrank", "artlist", {
+            month: previousMonthKey,
+            keyword: logKeyword(queryTerms.historyKeyword),
+          });
           previousHistory = await fetchHistoricalMonth(
             client,
             previousMonthKey,
             queryTerms.historyKeyword
           );
-        } catch {
+        } catch (error) {
+          log.warn("wxrank", "artlist failed; stopping route", {
+            month: previousMonthKey,
+            keyword: logKeyword(queryTerms.historyKeyword),
+            reason: error instanceof Error ? error.message : "unknown error",
+          });
           throw new WxrankProviderError();
         }
         if (previousHistory) {
           allHistoricalRaw.push(...previousHistory);
         }
+
+        const previousQualified = previousHistory
+          ? filterAndRankHistoricalArticles(
+              previousHistory.map(toRankedHistoricalArticle),
+              input.topicPlan ?? queryTerms.scoringTerms,
+              now
+            ).length
+          : 0;
+        log.info("wxrank", "artlist completed", {
+          month: previousMonthKey,
+          raw: previousHistory?.length ?? 0,
+          qualified: previousQualified,
+        });
 
         rankedHistory = filterAndRankHistoricalArticles(
           allHistoricalRaw.map(toRankedHistoricalArticle),
@@ -511,7 +571,11 @@ export function createWxrankSearchProvider(
         .slice(0, RESULT_LIMIT);
 
       if (rankedHistory.length < QUALIFIED_HISTORY_THRESHOLD) {
+        realtimeRequested = true;
         try {
+          log.info("wxrank", "getso", {
+            keyword: logKeyword(queryTerms.realtimeKeyword || input.query),
+          });
           const realtime = await client.searchArticles({
             keyword: queryTerms.realtimeKeyword || input.query,
             sortType: 4,
@@ -527,11 +591,20 @@ export function createWxrankSearchProvider(
                   input.topicPlan
                 )
             );
+          realtimeQualified = realtimeResults.length;
+          log.info("wxrank", "getso completed", {
+            raw: realtime.length,
+            qualified: realtimeQualified,
+          });
           results = dedupeByUrl([
             ...results,
             ...realtimeResults,
           ]).slice(0, RESULT_LIMIT);
-        } catch {
+        } catch (error) {
+          log.warn("wxrank", "getso failed; using available history", {
+            keyword: logKeyword(queryTerms.realtimeKeyword || input.query),
+            reason: error instanceof Error ? error.message : "unknown error",
+          });
           if (results.length === 0) {
             throw new WxrankProviderError();
           }
@@ -542,6 +615,19 @@ export function createWxrankSearchProvider(
       if (results.length === 0) {
         throw new WxrankProviderError();
       }
+
+      const route = realtimeRequested && realtimeQualified > 0
+        ? rankedHistory.length > 0
+          ? "mixed"
+          : "realtime-fallback"
+        : previousMonthRequested
+          ? "history-extended"
+          : "history-only";
+      log.info("wxrank", `route=${route}`, {
+        historyQualified: rankedHistory.length,
+        realtimeQualified,
+        final: results.length,
+      });
 
       emitProgress(onProgress, results);
       return enrichDeepDiveArticles(client, results, onProgress);
