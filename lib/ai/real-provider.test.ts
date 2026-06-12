@@ -54,4 +54,64 @@ describe("real provider logging", () => {
     expect(logs).not.toContain("SAFE_CORE");
     expect(logs).not.toContain("SAFE_HISTORY");
   });
+
+  it("uses flash only for topic search planning and pro for other deepseek calls", async () => {
+    vi.resetModules();
+    vi.stubEnv("DEEPSEEK_API_KEY", "test-key");
+    vi.stubEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1");
+    vi.stubEnv("DEEPSEEK_MODEL", "deepseek-v4-flash");
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({
+              coreTopic: "Claude 神话模型",
+              historyKeyword: "Claude",
+              realtimeKeyword: "Claude 神话模型",
+              requiredTerms: ["Claude"],
+              relatedTerms: ["神话模型"],
+              excludedTerms: [],
+            }) } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({
+              brief: {
+                objective: "讲清楚模型选择",
+                audience: "内容创作者",
+                persona: "主编",
+                tone: "直接",
+                dropOffPoint: "知道何时用 pro",
+                constraints: ["保持具体"],
+              },
+            }) } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    vi.stubGlobal("fetch", fetchSpy);
+    const { createRealAIProvider } = await import("./real-provider");
+
+    const provider = createRealAIProvider("deepseek");
+    await provider.planTopicSearch("Claude神话模型");
+    await provider.generateBrief({
+      topicId: "topic-1",
+      topicLabel: "模型选择",
+      topicAngle: "成本与质量",
+      coreViewpoint: "意图识别用 flash，正文链路用 pro。",
+      targetAudience: "内容创作者",
+      reason: "避免质量掉档。",
+      structureType: "清单干货型",
+      searchEnabled: false,
+    });
+
+    const models = fetchSpy.mock.calls.map((call) =>
+      JSON.parse(String(call[1]?.body)).model
+    );
+    expect(models).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
+  });
 });

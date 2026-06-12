@@ -69,14 +69,18 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
 
   // DeepSeek uses the same OpenAI-compatible API as Mimo.
   const defaultModel =
-    config.name === "deepseek" ? "deepseek-v4-flash" : "mimo-v2.5-pro";
+    config.name === "deepseek" ? "deepseek-v4-pro" : "mimo-v2.5-pro";
+  const planModel =
+    config.name === "deepseek" ? "deepseek-v4-flash" : defaultModel;
+  const generationModel =
+    config.name === "deepseek" ? defaultModel : config.model?.trim() || defaultModel;
   const defaultBaseUrl =
     config.name === "deepseek"
       ? "https://api.deepseek.com/v1"
       : "https://token-plan-cn.xiaomimimo.com/v1";
   const providerLabel = config.name;
 
-  const defaults = { model: defaultModel, baseUrl: defaultBaseUrl, label: providerLabel };
+  const defaults = { model: generationModel, baseUrl: defaultBaseUrl, label: providerLabel };
 
   return {
     planTopicSearch: (idea) =>
@@ -86,6 +90,7 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
           '{"coreTopic":"string","historyKeyword":"string","realtimeKeyword":"string","requiredTerms":["string"],"relatedTerms":["string"],"excludedTerms":["string"]}',
         maxTokens: 500,
         temperature: 0.15,
+        model: planModel,
         schema: topicSearchPlanSchema,
         label: `${providerLabel} topic search plan`,
         retries: 2,
@@ -185,6 +190,8 @@ type MimoCallSpec<TInput, TOutput> = {
   jsonHint: string;
   maxTokens: number;
   temperature?: number;
+  /** Override the default model for this call (e.g. use flash for cheap planning). */
+  model?: string;
   schema: { parse: (data: unknown) => TOutput };
   label: string;
   retries?: number;
@@ -199,7 +206,7 @@ async function callMimo<TInput, TOutput>(
   spec: MimoCallSpec<TInput, TOutput>,
 ): Promise<TOutput> {
   const prompt = spec.buildPrompt(input);
-  const model = config.model?.trim() || defaults.model;
+  const model = spec.model || defaults.model;
   const baseUrl = config.baseUrl?.trim() || defaults.baseUrl;
 
   const maxAttempts = spec.retries ?? 1;
