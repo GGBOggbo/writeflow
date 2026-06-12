@@ -59,6 +59,7 @@ describe("AI routes", () => {
       body: JSON.stringify({
         operationId,
         idea: "公众号 AI 写作流程",
+        searchEnabled: true,
       }),
       headers: {
         "content-type": "application/json",
@@ -81,6 +82,8 @@ describe("AI routes", () => {
       operationId
     );
     expect(creditMocks.refund).not.toHaveBeenCalled();
+    expect(creditMocks.reserve).toHaveBeenCalledTimes(1);
+    expect(creditMocks.consume).toHaveBeenCalledTimes(1);
   });
 
   it("streams the balance and result after charging a credit", async () => {
@@ -115,6 +118,8 @@ describe("AI routes", () => {
       "test-user",
       operationId
     );
+    expect(creditMocks.reserve).toHaveBeenCalledTimes(1);
+    expect(creditMocks.consume).toHaveBeenCalledTimes(1);
   });
 
   it("charges a separate humanize credit after draft delivery", async () => {

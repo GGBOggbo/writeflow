@@ -252,6 +252,12 @@ function normalizedPlanTerms(terms: string[]) {
   return uniqueTerms(terms.map((term) => term.trim()).filter(Boolean));
 }
 
+function isTopicSearchPlan(
+  value: string[] | TopicSearchPlan
+): value is TopicSearchPlan {
+  return !Array.isArray(value);
+}
+
 export function isRelevantToTopicPlan(
   title: string,
   content: string,
@@ -304,11 +310,13 @@ export function filterAndRankHistoricalArticles(
   scoringTermsOrPlan: string[] | TopicSearchPlan,
   now: Date
 ): WxrankHistoricalArticle[] {
-  const plan = Array.isArray(scoringTermsOrPlan) ? undefined : scoringTermsOrPlan;
+  const plan = isTopicSearchPlan(scoringTermsOrPlan)
+    ? scoringTermsOrPlan
+    : undefined;
   const terms = normalizedPlanTerms(
     plan
       ? [...plan.requiredTerms, ...plan.relatedTerms]
-      : scoringTermsOrPlan
+      : (scoringTermsOrPlan as string[])
   );
   if (terms.length === 0 || !Number.isFinite(now.getTime())) {
     return [];
