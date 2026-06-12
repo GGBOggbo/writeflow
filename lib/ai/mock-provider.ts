@@ -1,8 +1,14 @@
 import type { AIProvider } from "./provider";
+import { buildFallbackTopicSearchPlan } from "@/lib/search/topic-search-plan";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const mockAIProvider: AIProvider = {
+  async planTopicSearch(idea) {
+    await wait(40);
+    return buildFallbackTopicSearchPlan(idea);
+  },
+
   async summarizeBenchmarks(results) {
     await wait(80);
 

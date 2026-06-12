@@ -7,6 +7,7 @@ import {
   topicResponseSchema,
   benchmarkSummaryResponseSchema,
 } from "./schemas";
+import { topicSearchPlanSchema } from "@/lib/search/topic-search-plan";
 import { log } from "@/lib/debug";
 import { buildBriefPrompt } from "./prompts/brief";
 import { buildDraftPrompt } from "./prompts/draft";
@@ -15,6 +16,7 @@ import { buildMetaPrompt } from "./prompts/meta";
 import { buildOutlinePrompt } from "./prompts/outline";
 import { buildTopicsPrompt } from "./prompts/topics";
 import { buildBenchmarkSummaryPrompt } from "./prompts/benchmark-summary";
+import { buildTopicSearchPlanPrompt } from "./prompts/topic-search-plan";
 import { assertProviderKey, getRealProviderConfig } from "./provider-config";
 import type { AIProvider, RealAIProviderName } from "./provider";
 import { parseJsonCandidates } from "./parse-json";
@@ -30,6 +32,10 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
   if (config.name !== "mimo" && config.name !== "deepseek") {
     // Only mimo and deepseek are fully implemented; return a provider that throws on every call.
     return {
+      async planTopicSearch() {
+        assertProviderKey(config);
+        throw notImplemented(config.name, "topic search planning");
+      },
       async generateTopics() {
         assertProviderKey(config);
         throw notImplemented(config.name, "topics");
@@ -73,6 +79,18 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
   const defaults = { model: defaultModel, baseUrl: defaultBaseUrl, label: providerLabel };
 
   return {
+    planTopicSearch: (idea) =>
+      callMimo(idea, config, defaults, {
+        buildPrompt: buildTopicSearchPlanPrompt,
+        jsonHint:
+          '{"coreTopic":"string","historyKeyword":"string","realtimeKeyword":"string","requiredTerms":["string"],"relatedTerms":["string"],"excludedTerms":["string"]}',
+        maxTokens: 500,
+        temperature: 0.15,
+        schema: topicSearchPlanSchema,
+        label: `${providerLabel} topic search plan`,
+        retries: 2,
+      }),
+
     summarizeBenchmarks: (results) =>
       callMimo(results, config, defaults, {
         buildPrompt: buildBenchmarkSummaryPrompt,
