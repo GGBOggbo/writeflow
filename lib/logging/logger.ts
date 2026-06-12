@@ -48,7 +48,7 @@ function baseOptions(level: string): pino.LoggerOptions {
     },
     mixin() {
       const context = getLogContext();
-      return context ? context : { contextMissing: true };
+      return context ? { ...context } : { contextMissing: true };
     },
   };
 }

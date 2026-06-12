@@ -45,6 +45,47 @@ describe("app logger", () => {
     ]);
   });
 
+  it("does not let one log payload mutate later request context logs", async () => {
+    const capture = captureLogger();
+
+    await runWithLogContext(
+      {
+        requestId: "request-a",
+        workflowId: "workflow-a",
+        workflowIdSource: "client",
+        operationId: "operation-a",
+        stage: "topics",
+      },
+      async () => {
+        capture.logger.info({
+          event: "search.plan.completed",
+          plan: { coreTopic: "Claude" },
+          raw: 20,
+          selected: [{ rank: 1, title: "article" }],
+        }, "plan completed");
+        capture.logger.info({
+          event: "search.article_info.completed",
+          endpoint: "artinfo",
+          htmlChars: 130652,
+        }, "artinfo completed");
+      }
+    );
+
+    const [, articleInfoRecord] = capture.records();
+    expect(articleInfoRecord).toMatchObject({
+      event: "search.article_info.completed",
+      requestId: "request-a",
+      workflowId: "workflow-a",
+      operationId: "operation-a",
+      stage: "topics",
+      endpoint: "artinfo",
+      htmlChars: 130652,
+    });
+    expect(articleInfoRecord).not.toHaveProperty("plan");
+    expect(articleInfoRecord).not.toHaveProperty("raw");
+    expect(articleInfoRecord).not.toHaveProperty("selected");
+  });
+
   it("marks logs emitted outside request context", () => {
     const capture = captureLogger();
     capture.logger.info({ event: "test.outside" }, "outside");
