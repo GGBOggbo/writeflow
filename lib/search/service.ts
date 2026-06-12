@@ -4,6 +4,7 @@ import { buildSearchReferenceBundle } from "./normalize";
 import { disabledSearchProvider } from "./disabled-provider";
 import { genericSearchProvider } from "./generic-provider";
 import { jizhilaSearchProvider } from "./jizhila-provider";
+import { wxrankSearchProvider } from "./wxrank-provider";
 import type {
   SearchFreshness,
   SearchIntent,
@@ -21,6 +22,10 @@ function getSearchProvider() {
 
   if (providerName === "jizhila") {
     return jizhilaSearchProvider;
+  }
+
+  if (providerName === "wxrank") {
+    return wxrankSearchProvider;
   }
 
   return disabledSearchProvider;

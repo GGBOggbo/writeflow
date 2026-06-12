@@ -58,8 +58,16 @@ OPENAI_MODEL=
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=
 
-# 搜索提供商：disabled | bocha | jizhila
+# 搜索提供商：disabled | bocha | jizhila | wxrank
 SEARCH_PROVIDER=disabled
+
+# wxrank（公众号搜索，推荐）
+WXRANK_API_KEY=
+WXRANK_BASE_URL=https://data.wxrank.com
+WXRANK_HISTORY_MIN_RESULTS=5
+WXRANK_RESULT_LIMIT=8
+WXRANK_DEEP_DIVE_LIMIT=2
+WXRANK_COMMENT_TOP_N=10
 
 # 机智拉（公众号搜索）
 JIZHILA_API_KEY=
@@ -104,16 +112,19 @@ JIZHILA_ENRICH_COMMENT_TOP_N=10
 | 正文 | 永远断网 | 保护成稿真实感 |
 | 标题摘要 | 自动复用 | 复用选题搜索结果 |
 
-搜索增强流程：
+wxrank 搜索增强流程：
 
 ```
-web_search（最多 15 条）
-    → 截取前 8 篇
-    → 粗筛 5 篇补互动数据（read_zan_pro）
-    → 精筛 2 篇抓全文（article_html）
-    → 有评论的深拆文章抓评论（article_comment2）
-    → 智能排序后取前 4 篇给模型参考
+artlist 当前月（历史库，低成本）
+    → 不足 5 篇再查上月 artlist
+    → 仍不足 5 篇才调用 getso 实时搜索
+    → 合并去重后最多保留 8 篇
+    → 选 2 篇标杆调用 artinfo 抓正文 HTML
+    → 有 comment_id 再调用 getcm 抓高赞留言
+    → 后续策略单、大纲、正文、标题摘要复用同一份参考池
 ```
+
+wxrank 会把极致了旧链路里的 `web_search/read_zan_pro/article_html/article_comment2` 平替为 `artlist/getso/artinfo/getcm`。历史库自带阅读、点赞、在看和分享数据，因此历史命中时不再额外调用阅读互动接口。
 
 ## AI 提供商
 

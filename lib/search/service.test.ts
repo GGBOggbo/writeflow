@@ -173,6 +173,45 @@ describe("search service", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("calls wxrank only when SEARCH_PROVIDER=wxrank", async () => {
+    vi.stubEnv("SEARCH_PROVIDER", "wxrank");
+    vi.stubEnv("WXRANK_API_KEY", "test-key");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 0,
+          data: {
+            list: Array.from({ length: 5 }, (_, index) => ({
+              pub_time: `2026-06-1${index} 10:00:00`,
+              title: `Claude 神话模型历史文章 ${index}`,
+              read_num: 20_000 + index,
+              like_num: 300,
+              look_num: 80,
+              share_num: 120,
+              art_url: `https://mp.weixin.qq.com/s?__biz=biz${index}&mid=1&idx=1&sn=sn${index}`,
+              content: "Claude 神话 模型 正文",
+            })),
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const bundle = await searchForTopics("Claude神话模型", "default");
+
+    expect(bundle.status).toBe("success");
+    expect(bundle.results[0]?.source).toBe("wechat");
+    expect(bundle.results[0]?.engagementMetrics?.readCount).toBeDefined();
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
+      "https://data.wxrank.com/weixin/artlist"
+    );
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toMatchObject({
+      key: "test-key",
+      month: "202606",
+      keyword: "Claude",
+    });
+  });
+
   it("assigns sort and freshness by search intent before calling Jizhila", async () => {
     vi.stubEnv("SEARCH_PROVIDER", "jizhila");
     vi.stubEnv("JIZHILA_API_KEY", "test-key");
