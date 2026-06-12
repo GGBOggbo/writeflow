@@ -229,6 +229,11 @@ describe("AI service", () => {
     });
 
     expect(result.searchContext).toEqual(searchContext);
+    const plannerPayload = JSON.parse(
+      String(fetchSpy.mock.calls[0]?.[1]?.body)
+    );
+    expect(plannerPayload.max_completion_tokens).toBe(500);
+    expect(plannerPayload.temperature).toBe(0.15);
     expect(fetchSpy.mock.calls[1]?.[1]?.body).toEqual(
       expect.stringContaining("搜索 query：AI 写作 痛点")
     );
