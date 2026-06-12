@@ -15,6 +15,10 @@ const stepPrerequisites: Record<WorkflowStep, (s: WorkflowState) => boolean> = {
   finalize: (s) => s.titleOptions.length > 0,
 };
 
+function createWorkflowId() {
+  return globalThis.crypto.randomUUID();
+}
+
 export function canGoToWorkflowStep(
   state: WorkflowState,
   step: WorkflowStep
@@ -24,6 +28,7 @@ export function canGoToWorkflowStep(
 
 export function createInitialWorkflowState(): WorkflowState {
   return {
+    workflowId: createWorkflowId(),
     currentStep: "idea_input",
     ideaInput: "",
     structureType: STRUCTURE_TYPE_OPTIONS[0],

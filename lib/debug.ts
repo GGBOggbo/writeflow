@@ -1,74 +1,90 @@
-/**
- * Unified toggleable logger for the entire application.
- *
- * Set `LOG_LEVEL` in `.env.local` to control verbosity:
- *
- *   LOG_LEVEL=error   — only errors (default if unset)
- *   LOG_LEVEL=warn    — errors + warnings
- *   LOG_LEVEL=info    — errors + warnings + request/result summaries
- *   LOG_LEVEL=debug   — all of the above + detailed payload dumps
- *
- * Omit the variable (or set anything else) to get `error` level.
- *
- * Usage:
- *   import { log } from "@/lib/debug";
- *   log.info("topics", "请求发送", { query: "..." });
- *   log.error("topics", err);
- */
+import "server-only";
+import { getAppLogger } from "@/lib/logging/logger";
 
-type LogLevel = "error" | "warn" | "info" | "debug";
+function safeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      errorType: error.name,
+      errorMessage: error.message,
+    };
+  }
 
-const LEVEL_RANK: Record<LogLevel, number> = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  debug: 3,
-};
-
-function currentLevel(): LogLevel {
-  const raw = process.env.LOG_LEVEL?.trim().toLowerCase();
-  if (raw && raw in LEVEL_RANK) return raw as LogLevel;
-  return "error";
+  return {
+    errorType: typeof error,
+    errorMessage: String(error ?? ""),
+  };
 }
 
-function shouldLog(level: LogLevel): boolean {
-  return LEVEL_RANK[level] <= LEVEL_RANK[currentLevel()];
+function asLogObject(scope: string, details?: Record<string, unknown>) {
+  return { scope, ...(details ?? {}) };
+}
+
+function currentLevel() {
+  const raw = process.env.LOG_LEVEL?.trim().toLowerCase();
+  return raw && ["fatal", "error", "warn", "info", "debug", "trace", "silent"].includes(raw)
+    ? raw
+    : "error";
+}
+
+function syncLevel() {
+  getAppLogger().level = currentLevel();
 }
 
 export const log = {
   /** Log an error — always visible (default level). */
   error(scope: string, tagOrError: string | unknown, error?: unknown) {
-    if (!shouldLog("error")) return;
-    if (typeof tagOrError === "string") {
-      const message = error instanceof Error ? error.message : String(error ?? "");
-      console.error(`[${scope}] ✗ ${tagOrError} | ${message}`);
-    } else {
-      const message = tagOrError instanceof Error ? tagOrError.message : String(tagOrError);
-      console.error(`[${scope}] ✗ ${message}`);
+    try {
+      syncLevel();
+      const appLogger = getAppLogger();
+      if (typeof tagOrError === "string") {
+        appLogger.error(asLogObject(scope, safeError(error)), tagOrError);
+      } else {
+        const safe = safeError(tagOrError);
+        appLogger.error(asLogObject(scope, safe), safe.errorMessage);
+      }
+    } catch {
+      // Logging must never break the business flow.
     }
   },
 
   /** Log a warning — e.g. degraded pipeline, quality alerts. */
   warn(scope: string, message: string, details?: Record<string, unknown>) {
-    if (!shouldLog("warn")) return;
-    const suffix = details ? ` | ${JSON.stringify(details)}` : "";
-    console.warn(`[${scope}] ⚠ ${message}${suffix}`);
+    try {
+      syncLevel();
+      const appLogger = getAppLogger();
+      appLogger.warn(asLogObject(scope, details), message);
+    } catch {
+      // Logging must never break the business flow.
+    }
   },
 
   /** Log a one-liner info — request sent, result summary, timing. */
   info(scope: string, message: string, details?: Record<string, unknown>) {
-    if (!shouldLog("info")) return;
-    const suffix = details ? ` | ${JSON.stringify(details)}` : "";
-    console.log(`[${scope}] → ${message}${suffix}`);
+    try {
+      syncLevel();
+      const appLogger = getAppLogger();
+      appLogger.info(asLogObject(scope, details), message);
+    } catch {
+      // Logging must never break the business flow.
+    }
   },
 
   /** Log verbose details — raw payloads, response dumps, etc. */
   debug(scope: string, message: string, data?: unknown) {
-    if (!shouldLog("debug")) return;
-    if (data !== undefined) {
-      console.log(`[${scope}] … ${message}`, JSON.stringify(data, null, 2));
-    } else {
-      console.log(`[${scope}] … ${message}`);
+    try {
+      syncLevel();
+      const appLogger = getAppLogger();
+      appLogger.debug(
+        asLogObject(
+          scope,
+          data && typeof data === "object" && !Array.isArray(data)
+            ? (data as Record<string, unknown>)
+            : { data }
+        ),
+        message
+      );
+    } catch {
+      // Logging must never break the business flow.
     }
   },
 } as const;

@@ -73,6 +73,7 @@ export type MetaCard = {
 };
 
 export type WorkflowState = {
+  workflowId: string;
   currentStep: WorkflowStep;
   ideaInput: string;
   structureType: StructureType;

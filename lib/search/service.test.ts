@@ -9,6 +9,7 @@ import {
   searchForOutline,
   searchForTopics,
 } from "./service";
+import { capturePinoOutput } from "@/lib/logging/test-utils";
 
 describe("search service", () => {
   afterEach(() => {
@@ -210,6 +211,46 @@ describe("search service", () => {
       month: "202606",
       keyword: "Claude",
     });
+  });
+
+  it("logs prepared search context without leaking article bodies", async () => {
+    vi.stubEnv("SEARCH_PROVIDER", "bocha");
+    vi.stubEnv("BOCHA_API_KEY", "test-key");
+    vi.stubEnv("LOG_LEVEL", "debug");
+    const capture = capturePinoOutput();
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 200,
+          data: {
+            webPages: {
+              value: [
+                {
+                  name: "测试文章",
+                  url: "https://example.com/1",
+                  snippet: "摘要内容",
+                  summary: "摘要内容",
+                  siteName: "微信公众号",
+                  datePublished: "2026-06-11",
+                },
+              ],
+            },
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    await searchForTopics("测试查询", "default");
+
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"event":"search.context.prepared"');
+    expect(logs).toContain('"intent":"topics"');
+    expect(logs).toContain('"results":1');
+    expect(logs).toContain('"sources":{"wechat":1}');
+    expect(logs).not.toContain("apiKey");
+    expect(logs).not.toContain("<p>");
   });
 
   it("assigns sort and freshness by search intent before calling Jizhila", async () => {

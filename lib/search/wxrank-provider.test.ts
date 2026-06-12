@@ -7,6 +7,7 @@ import {
 } from "./wxrank-provider";
 import type { SearchQueryInput } from "./types";
 import type { WorkflowProgressEvent } from "@/lib/progress/types";
+import { capturePinoOutput } from "@/lib/logging/test-utils";
 
 const fixedNow = new Date("2026-06-12T00:00:00+08:00");
 
@@ -197,7 +198,7 @@ afterEach(() => {
 describe("wxrank search provider", () => {
   it("uses planned keywords and filters realtime results with the same gate", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
       history: [[], []],
       realtime: [
@@ -232,28 +233,32 @@ describe("wxrank search provider", () => {
     expect(results.map((result) => result.title)).toEqual([
       "GPT-5.6 如何改变普通职场人",
     ]);
-    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(logs).toContain("[wxrank] → artlist");
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"scope":"wxrank"');
+    expect(logs).toContain('"event":"search.provider.started"');
+    expect(logs).toContain('"event":"search.provider.completed"');
     expect(logs).toContain('"month":"202606"');
     expect(logs).toContain('"raw":0');
-    expect(logs).toContain("[wxrank] → getso");
+    expect(logs).toContain('"endpoint":"getso"');
     expect(logs).toContain('"raw":2');
     expect(logs).toContain('"retained":1');
     expect(logs).toContain('"rejected":1');
     expect(logs).toContain('"rejectedReasons":{"命中排除方向":1}');
     expect(logs).toMatch(/"elapsedMs":\d+/);
-    expect(logs).toContain("[wxrank] … retained result");
-    expect(logs).toContain('"origin": "realtime"');
+    expect(logs).toContain('"event":"search.retained_result"');
+    expect(logs).toContain('"origin":"realtime"');
     expect(logs).toContain('"matchedTerms"');
     expect(logs).toContain('"reasons"');
-    expect(logs).toContain("route=realtime-fallback");
+    expect(logs).toContain('"event":"search.route.selected"');
+    expect(logs).toContain('"route":"realtime-fallback"');
     expect(logs).not.toContain("apiKey");
     expect(logs).not.toContain("<p>普通员工需要重新规划岗位转型。</p>");
   });
 
   it("uses current-month history only when it has at least five qualified articles", async () => {
     vi.stubEnv("LOG_LEVEL", "info");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
       history: [
         [
@@ -309,11 +314,14 @@ describe("wxrank search provider", () => {
     ]);
     expect(progress.find((event) => event.stepId === "engagement_enrichment_started")?.detail)
       .toBe("选用 5 篇 wxrank 历史库已有互动数据");
-    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(logs).toContain("[wxrank] → artlist");
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"event":"search.provider.completed"');
+    expect(logs).toContain('"endpoint":"artlist"');
     expect(logs).toContain('"raw":5');
     expect(logs).toContain('"qualified":5');
-    expect(logs).toContain("route=history-only");
+    expect(logs).toContain('"event":"search.route.selected"');
+    expect(logs).toContain('"route":"history-only"');
     expect(logs).not.toContain("getso");
   });
 
@@ -490,7 +498,7 @@ describe("wxrank search provider", () => {
 
   it("deep-dives exactly two selected articles with html and comments", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
       history: [Array.from({ length: 8 }, (_, index) => article(index + 1))],
       articleInfo: [
@@ -543,12 +551,13 @@ describe("wxrank search provider", () => {
       ]);
     expect(progress.map((event) => event.stepId)).toContain("deep_dive_started");
     expect(progress.map((event) => event.stepId)).toContain("deep_dive_completed");
-    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(logs).toContain("[wxrank] … deep-dive selected");
-    expect(logs).toContain("[wxrank] → artinfo completed");
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"event":"search.deep_dive.selected"');
+    expect(logs).toContain('"event":"search.article_info.completed"');
     expect(logs).toContain('"htmlChars"');
     expect(logs).toContain('"hasCommentId":true');
-    expect(logs).toContain("[wxrank] → getcm completed");
+    expect(logs).toContain('"event":"search.comments.completed"');
     expect(logs).toContain('"raw":3');
     expect(logs).toContain('"retained":3');
     expect(logs).not.toContain("置顶评论");
@@ -557,7 +566,7 @@ describe("wxrank search provider", () => {
 
   it("skips comment enrichment when article info has no comment id", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
       history: [Array.from({ length: 5 }, (_, index) => article(index + 1))],
       articleInfo: [
@@ -571,14 +580,15 @@ describe("wxrank search provider", () => {
     expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(2);
     expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(0);
     expect(results.filter((result) => result.articleHtml)).toHaveLength(2);
-    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(logs).toContain("[wxrank] … getcm skipped");
-    expect(logs).toContain('"reason": "missing-comment-id"');
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"event":"search.comments.skipped"');
+    expect(logs).toContain('"reason":"missing-comment-id"');
   });
 
   it("keeps base results when one artinfo call and one getcm call fail", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
       history: [Array.from({ length: 8 }, (_, index) => article(index + 1))],
       articleInfo: [
@@ -596,7 +606,8 @@ describe("wxrank search provider", () => {
     expect(results.filter((result) => result.articleHtml)).toHaveLength(1);
     expect(results.filter((result) => result.comments?.length)).toHaveLength(0);
     expect(results.map((result) => result.title)).toContain("Claude 神话模型实测 1");
-    const warnings = warnSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    const warnings = capture.output();
+    capture.restore();
     expect(warnings).toContain("artinfo failed; keeping base result");
     expect(warnings).toContain("getcm failed; keeping article info");
     expect(warnings).toContain('"errorType":"Error"');

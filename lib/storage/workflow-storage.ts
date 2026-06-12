@@ -13,6 +13,8 @@ const LEGACY_PLACEHOLDER_PERSONA =
   "像一个踩过坑、愿意说真话的实战派前辈，陪读者把问题讲透。";
 const LEGACY_PLACEHOLDER_DROP_OFF_POINT =
   "让读者记住这篇文章最核心的判断，并愿意立刻开始下一步行动或表达共鸣。";
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function saveWorkflowState(state: WorkflowState) {
   if (typeof window === "undefined") {
@@ -66,6 +68,10 @@ function normalizeWorkflowState(
   const nextState: WorkflowState = {
     ...baseState,
     ...rawState,
+    workflowId:
+      typeof rawState.workflowId === "string" && UUID_PATTERN.test(rawState.workflowId)
+        ? rawState.workflowId
+        : baseState.workflowId,
     searchSettings: {
       ...baseState.searchSettings,
       ...rawState.searchSettings,

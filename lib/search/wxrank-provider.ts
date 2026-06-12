@@ -281,6 +281,8 @@ async function fetchHistoricalMonth(
     }
 
     log.warn("wxrank", "artlist failed; continuing route", {
+      event: "search.provider.failed",
+      endpoint: "artlist",
       month,
       keyword: logKeyword(keyword),
       reason: error instanceof Error ? error.message : "unknown error",
@@ -390,6 +392,8 @@ async function enrichOneDeepDiveArticle(
     let enriched = applyArticleInfo(result, articleInfo);
     const commentId = articleInfo.comment_id?.toString().trim();
     log.info("wxrank", "artinfo completed", {
+      event: "search.article_info.completed",
+      endpoint: "artinfo",
       title,
       htmlChars: articleInfo.html.length,
       hasCommentId: Boolean(commentId),
@@ -405,6 +409,8 @@ async function enrichOneDeepDiveArticle(
         });
         const comments = parseComments(rawComments);
         log.info("wxrank", "getcm completed", {
+          event: "search.comments.completed",
+          endpoint: "getcm",
           title,
           raw: rawComments.length,
           retained: comments.length,
@@ -418,6 +424,8 @@ async function enrichOneDeepDiveArticle(
         }
       } catch (error) {
         log.warn("wxrank", "getcm failed; keeping article info", {
+          event: "search.comments.failed",
+          endpoint: "getcm",
           title,
           errorType: errorType(error),
           elapsedMs: Date.now() - commentsStartedAt,
@@ -426,6 +434,8 @@ async function enrichOneDeepDiveArticle(
       }
     } else {
       log.debug("wxrank", "getcm skipped", {
+        event: "search.comments.skipped",
+        endpoint: "getcm",
         title,
         reason: "missing-comment-id",
       });
@@ -434,6 +444,8 @@ async function enrichOneDeepDiveArticle(
     return { originalUrl, result: enriched };
   } catch (error) {
     log.warn("wxrank", "artinfo failed; keeping base result", {
+      event: "search.article_info.failed",
+      endpoint: "artinfo",
       title,
       errorType: errorType(error),
       elapsedMs: Date.now() - articleInfoStartedAt,
@@ -466,15 +478,18 @@ async function enrichDeepDiveArticles(
   log.debug(
     "wxrank",
     "deep-dive selected",
-    candidates.map((candidate, index) => ({
-      rank: index + 1,
-      title: logText(candidate.title),
-      reasons: (candidate.qualitySignals?.reasons ?? []).map((reason) =>
-        logText(reason, 80)
-      ),
-      stableScore: candidate.qualitySignals?.stableScore,
-      anomalyScore: candidate.qualitySignals?.anomalyScore,
-    }))
+    {
+      event: "search.deep_dive.selected",
+      selected: candidates.map((candidate, index) => ({
+        rank: index + 1,
+        title: logText(candidate.title),
+        reasons: (candidate.qualitySignals?.reasons ?? []).map((reason) =>
+          logText(reason, 80)
+        ),
+        stableScore: candidate.qualitySignals?.stableScore,
+        anomalyScore: candidate.qualitySignals?.anomalyScore,
+      })),
+    }
   );
 
   onProgress?.({
@@ -520,7 +535,10 @@ export function createWxrankSearchProvider(
       let realtimeRequested = false;
       let realtimeQualified = 0;
 
-      log.debug("wxrank", "topic search plan", input.topicPlan ?? queryTerms);
+      log.debug("wxrank", "topic search plan", {
+        event: "search.plan.received",
+        plan: input.topicPlan ?? queryTerms,
+      });
 
       onProgress?.({
         stepId: "search_query_built",
@@ -537,6 +555,8 @@ export function createWxrankSearchProvider(
       const currentHistoryStartedAt = Date.now();
       try {
         log.info("wxrank", "artlist", {
+          event: "search.provider.started",
+          endpoint: "artlist",
           month: currentMonth,
           keyword: logKeyword(queryTerms.historyKeyword),
         });
@@ -547,6 +567,8 @@ export function createWxrankSearchProvider(
         );
       } catch (error) {
         log.warn("wxrank", "artlist failed; stopping route", {
+          event: "search.provider.failed",
+          endpoint: "artlist",
           month: currentMonth,
           keyword: logKeyword(queryTerms.historyKeyword),
           reason: error instanceof Error ? error.message : "unknown error",
@@ -565,6 +587,8 @@ export function createWxrankSearchProvider(
           ).length
         : 0;
       log.info("wxrank", "artlist completed", {
+        event: "search.provider.completed",
+        endpoint: "artlist",
         month: currentMonth,
         raw: currentHistory?.length ?? 0,
         qualified: currentQualified,
@@ -585,6 +609,8 @@ export function createWxrankSearchProvider(
         const previousHistoryStartedAt = Date.now();
         try {
           log.info("wxrank", "artlist", {
+            event: "search.provider.started",
+            endpoint: "artlist",
             month: previousMonthKey,
             keyword: logKeyword(queryTerms.historyKeyword),
           });
@@ -595,6 +621,8 @@ export function createWxrankSearchProvider(
           );
         } catch (error) {
           log.warn("wxrank", "artlist failed; stopping route", {
+            event: "search.provider.failed",
+            endpoint: "artlist",
             month: previousMonthKey,
             keyword: logKeyword(queryTerms.historyKeyword),
             reason: error instanceof Error ? error.message : "unknown error",
@@ -613,6 +641,8 @@ export function createWxrankSearchProvider(
             ).length
           : 0;
         log.info("wxrank", "artlist completed", {
+          event: "search.provider.completed",
+          endpoint: "artlist",
           month: previousMonthKey,
           raw: previousHistory?.length ?? 0,
           qualified: previousQualified,
@@ -638,6 +668,8 @@ export function createWxrankSearchProvider(
         const realtimeStartedAt = Date.now();
         try {
           log.info("wxrank", "getso", {
+            event: "search.provider.started",
+            endpoint: "getso",
             keyword: logKeyword(queryTerms.realtimeKeyword || input.query),
           });
           const realtime = await client.searchArticles({
@@ -668,6 +700,8 @@ export function createWxrankSearchProvider(
           });
           realtimeQualified = realtimeResults.length;
           log.info("wxrank", "getso completed", {
+            event: "search.provider.completed",
+            endpoint: "getso",
             raw: realtime.length,
             qualified: realtimeQualified,
             retained: realtimeQualified,
@@ -681,6 +715,8 @@ export function createWxrankSearchProvider(
           ]).slice(0, RESULT_LIMIT);
         } catch (error) {
           log.warn("wxrank", "getso failed; using available history", {
+            event: "search.provider.failed",
+            endpoint: "getso",
             keyword: logKeyword(queryTerms.realtimeKeyword || input.query),
             reason: error instanceof Error ? error.message : "unknown error",
           });
@@ -703,6 +739,8 @@ export function createWxrankSearchProvider(
           ? "history-extended"
           : "history-only";
       log.info("wxrank", `route=${route}`, {
+        event: "search.route.selected",
+        route,
         historyQualified: rankedHistory.length,
         realtimeQualified,
         final: results.length,
@@ -720,6 +758,7 @@ export function createWxrankSearchProvider(
         );
 
         log.debug("wxrank", "retained result", {
+          event: "search.retained_result",
           rank: index + 1,
           origin,
           title: logText(result.title),

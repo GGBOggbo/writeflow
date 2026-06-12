@@ -206,9 +206,19 @@ async function callMimo<TInput, TOutput>(
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    log.info("ai", `→ ${spec.label} | attempt=${attempt + 1}/${maxAttempts} model=${model} maxTokens=${spec.maxTokens}`);
-    log.debug("ai", `${spec.label} userPrompt`, prompt.userPrompt);
     const t0 = Date.now();
+    log.info("ai", "request started", {
+      event: "ai.request.started",
+      status: "started",
+      provider: config.name,
+      label: spec.label,
+      attempt: attempt + 1,
+      maxAttempts,
+      model,
+      maxTokens: spec.maxTokens,
+      systemPromptChars: prompt.systemPrompt.length,
+      userPromptChars: prompt.userPrompt.length,
+    });
 
     const response = await postMimoChatCompletion(baseUrl, config.apiKey, {
       model,
@@ -233,7 +243,7 @@ async function callMimo<TInput, TOutput>(
 
     if (!response.ok) {
       const errMsg = json?.error?.message || `${spec.label} 请求失败（${response.status}）`;
-      log.error("ai", spec.label, new Error(errMsg));
+      log.error("ai", "request failed", new Error(errMsg));
       throw new Error(errMsg);
     }
 
@@ -241,7 +251,15 @@ async function callMimo<TInput, TOutput>(
 
     if (!content) {
       const err = new Error(`${spec.label} 返回为空。`);
-      log.warn("ai", `${spec.label} 返回为空，${Date.now() - t0}ms`);
+      log.warn("ai", "request returned empty content", {
+        event: "ai.request.failed",
+        status: "failed",
+        provider: config.name,
+        label: spec.label,
+        attempt: attempt + 1,
+        model,
+        durationMs: Date.now() - t0,
+      });
       if (maxAttempts <= 1) throw err;
       lastError = err;
       continue;
@@ -260,8 +278,16 @@ async function callMimo<TInput, TOutput>(
         try {
           const transformed = spec.postParse ? spec.postParse(candidate) : candidate;
           const result = spec.schema.parse(transformed);
-          log.info("ai", `← ${spec.label} | OK ${Date.now() - t0}ms`);
-          log.debug("ai", `${spec.label} 返回内容预览`, content.slice(0, 300));
+          log.info("ai", "request succeeded", {
+            event: "ai.request.succeeded",
+            status: "succeeded",
+            provider: config.name,
+            label: spec.label,
+            attempt: attempt + 1,
+            model,
+            durationMs: Date.now() - t0,
+            responseChars: content.length,
+          });
           return result;
         } catch (error) {
           lastSchemaError = error;
@@ -273,10 +299,19 @@ async function callMimo<TInput, TOutput>(
         : new Error(`${spec.label} 返回内容格式不符合预期。`);
     } catch (error) {
       if (maxAttempts <= 1) {
-        log.error("ai", `${spec.label} 失败`, error);
+        log.error("ai", "response parse failed", error);
         throw error;
       }
-      log.warn("ai", `${spec.label} 解析失败，准备重试`, { attempt: attempt + 1, preview: content.slice(0, 200) });
+      log.warn("ai", "response parse failed; retrying", {
+        event: "ai.response.parse_failed",
+        status: "failed",
+        provider: config.name,
+        label: spec.label,
+        attempt: attempt + 1,
+        model,
+        durationMs: Date.now() - t0,
+        responseChars: content.length,
+      });
       lastError = error;
     }
   }

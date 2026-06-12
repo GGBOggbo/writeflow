@@ -34,6 +34,19 @@ describe("workflow storage", () => {
     expect(restored?.topicSearchContext?.results[0]?.url).toBe(
       "https://mp.weixin.qq.com/s/cached"
     );
+    expect(restored?.workflowId).toBe(state.workflowId);
+  });
+
+  it("adds a workflow id when restoring legacy state", () => {
+    const legacy = createInitialWorkflowState() as Partial<ReturnType<typeof createInitialWorkflowState>>;
+    delete legacy.workflowId;
+    window.localStorage.setItem("ai-writing-mvp-workflow", JSON.stringify(legacy));
+
+    const restored = loadWorkflowState();
+
+    expect(restored?.workflowId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
   });
 
   it("rewinds to the last valid step when restored state is inconsistent", () => {

@@ -94,7 +94,12 @@ export const genericSearchProvider: SearchProvider = {
       count: 8,
     });
 
-    log.info("search", `→ bocha | query="${query}" freshness="${bochaFreshness}"`);
+    log.info("search", `→ bocha | query="${query}" freshness="${bochaFreshness}"`, {
+      event: "search.provider.started",
+      provider: "bocha",
+      endpoint: "web-search",
+      freshness: bochaFreshness,
+    });
     const t0 = Date.now();
 
     const response = await fetch("https://api.bochaai.com/v1/web-search", {
@@ -111,16 +116,27 @@ export const genericSearchProvider: SearchProvider = {
     }
 
     const json = (await response.json()) as BochaSearchResponse;
-    log.debug("search", "bocha 原始响应", json.webPages?.value?.map((p) => ({
-      name: p.name,
-      siteName: p.siteName,
-      datePublished: p.datePublished,
-      snippetLen: (p.summary ?? p.snippet ?? "").length,
-    })));
+    log.debug("search", "bocha 原始响应", {
+      event: "search.provider.raw_summary",
+      provider: "bocha",
+      endpoint: "web-search",
+      pages: json.webPages?.value?.map((p) => ({
+        name: p.name,
+        siteName: p.siteName,
+        datePublished: p.datePublished,
+        snippetLen: (p.summary ?? p.snippet ?? "").length,
+      })),
+    });
 
     const results = parseBochaResults(json);
 
-    log.info("search", `← bocha | results=${results.length} ${Date.now() - t0}ms`);
+    log.info("search", `← bocha | results=${results.length} ${Date.now() - t0}ms`, {
+      event: "search.provider.completed",
+      provider: "bocha",
+      endpoint: "web-search",
+      results: results.length,
+      elapsedMs: Date.now() - t0,
+    });
 
     return results;
   },

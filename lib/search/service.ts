@@ -202,6 +202,13 @@ function createEmptyBundle(
   };
 }
 
+function countSources(results: SearchReferenceBundle["results"]) {
+  return results.reduce<Record<string, number>>((counts, result) => {
+    counts[result.source] = (counts[result.source] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
 async function fetchAndNormalize(
   query: string,
   intent: SearchIntent,
@@ -224,25 +231,44 @@ async function fetchAndNormalize(
   );
 
   if (results.length === 0) {
-    log.warn("search", `${intent} 搜索返回空结果`);
+    log.warn("search", `${intent} 搜索返回空结果`, {
+      event: "search.context.empty",
+      intent,
+      provider: process.env.SEARCH_PROVIDER?.trim().toLowerCase() || "disabled",
+    });
     return createEmptyBundle("empty", query, intent, freshness);
   }
 
   const bundle = buildSearchReferenceBundle(query, intent, results, freshness);
-  log.info("search", `← ${intent} | status=${bundle.status} results=${bundle.results.length} crowded=${bundle.crowdedness}`);
+  log.info("search", `← ${intent} | status=${bundle.status} results=${bundle.results.length} crowded=${bundle.crowdedness}`, {
+    event: "search.context.prepared",
+    intent,
+    status: bundle.status,
+    results: bundle.results.length,
+    sources: countSources(bundle.results),
+    crowdedness: bundle.crowdedness,
+    freshness,
+    provider: process.env.SEARCH_PROVIDER?.trim().toLowerCase() || "disabled",
+  });
 
   if (bundle.staleBuzzwords.length > 0 || bundle.crowdedness === "high") {
     log.warn("search", `${intent} 搜索质量预警`, {
+      event: "search.context.quality_warning",
+      intent,
       crowdedness: bundle.crowdedness,
       staleBuzzwords: bundle.staleBuzzwords,
     });
   }
 
-  log.debug("search", `${intent} 搜索结果摘要`, bundle.results.map((r) => ({
-    title: r.title,
-    source: r.source,
-    publishedAt: r.publishedAt,
-  })));
+  log.debug("search", `${intent} 搜索结果摘要`, {
+    event: "search.context.summary",
+    intent,
+    summaries: bundle.results.map((r) => ({
+      title: r.title,
+      source: r.source,
+      publishedAt: r.publishedAt,
+    })),
+  });
 
   return bundle;
 }

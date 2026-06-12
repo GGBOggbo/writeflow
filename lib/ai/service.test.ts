@@ -9,6 +9,7 @@ import {
 } from "./service";
 import * as searchService from "@/lib/search/service";
 import { mockAIProvider } from "./mock-provider";
+import { capturePinoOutput } from "@/lib/logging/test-utils";
 
 describe("AI service", () => {
   afterEach(() => {
@@ -80,7 +81,7 @@ describe("AI service", () => {
     vi.stubEnv("AI_PROVIDER", "mock");
     vi.stubEnv("SEARCH_PROVIDER", "wxrank");
     vi.stubEnv("LOG_LEVEL", "debug");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const capture = capturePinoOutput();
     vi.spyOn(mockAIProvider, "planTopicSearch").mockResolvedValueOnce({
       coreTopic: "Claude 神话模型",
       historyKeyword: "Claude",
@@ -123,13 +124,15 @@ describe("AI service", () => {
       searchMode: "default",
     });
 
-    const logs = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(logs).toContain("[topics] → start");
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"scope":"topics"');
+    expect(logs).toContain('"event":"topics.generation.started"');
     expect(logs).toContain('"searchProvider":"wxrank"');
-    expect(logs).toContain("[topics] … search plan");
-    expect(logs).toContain('"source": "ai"');
-    expect(logs).toContain('"addedTerms": [\n    "2025"');
-    expect(logs).toContain("[topics] → reference context");
+    expect(logs).toContain('"event":"search.plan.completed"');
+    expect(logs).toContain('"source":"ai"');
+    expect(logs).toContain('"addedTerms":["2025"]');
+    expect(logs).toContain('"event":"search.context.prepared"');
     expect(logs).toContain('"searchResults":2');
     expect(logs).toContain('"history":1');
     expect(logs).toContain('"realtime":1');
@@ -137,7 +140,7 @@ describe("AI service", () => {
     expect(logs).toContain('"withHtml":1');
     expect(logs).toContain('"withComments":1');
     expect(logs).toMatch(/"contextChars":\d+/);
-    expect(logs).toContain("[topics] → completed");
+    expect(logs).toContain('"event":"topics.generation.completed"');
     expect(logs).toContain('"topicCount":3');
     expect(logs).toMatch(/"plannerMs":\d+/);
     expect(logs).toMatch(/"searchMs":\d+/);
@@ -150,7 +153,7 @@ describe("AI service", () => {
   it("falls back to a safe plan when AI search planning fails", async () => {
     vi.stubEnv("AI_PROVIDER", "mock");
     vi.stubEnv("LOG_LEVEL", "warn");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const capture = capturePinoOutput();
     vi.spyOn(mockAIProvider, "planTopicSearch").mockRejectedValueOnce(
       new Error("planner unavailable")
     );
@@ -179,8 +182,11 @@ describe("AI service", () => {
       undefined,
       expect.objectContaining({ requiredTerms: ["GPT-5.6"] })
     );
-    expect(warnSpy.mock.calls.map((call) => call.join(" ")).join("\n"))
-      .toContain('search plan fallback | {"source":"fallback","errorType":"Error"}');
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"event":"search.plan.fallback"');
+    expect(logs).toContain('"source":"fallback"');
+    expect(logs).toContain('"errorType":"Error"');
   });
 
   it("throws a clear error for unsupported providers", async () => {

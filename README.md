@@ -197,6 +197,10 @@ npm run lint
 npm run build
 ```
 
+## 日志链路
+
+服务端日志使用 Pino JSON，API 请求会贯穿 `requestId`、`workflowId` 和 `operationId`。选题阶段可以按 `event=search.route.selected`、`event=search.provider.completed`、`event=search.context.prepared` 判断走了历史库、实时搜索还是混合路由。详细事件和 Vercel 查询方式见 [docs/logging.md](docs/logging.md)。
+
 ## License
 
 MIT

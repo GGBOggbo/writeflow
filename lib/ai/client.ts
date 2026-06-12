@@ -27,20 +27,40 @@ type MeteredInput<T> = T & {
   operationId: string;
 };
 
+type ConfirmWorkflowId = (workflowId: string) => void;
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function reportConfirmedWorkflowId(
+  response: Response,
+  onWorkflowId?: ConfirmWorkflowId
+) {
+  const confirmed = response.headers.get("X-Workflow-Id");
+  if (confirmed && UUID_PATTERN.test(confirmed)) {
+    onWorkflowId?.(confirmed);
+  }
+}
+
 async function postJsonStream<TResponse>(
   url: string,
+  workflowId: string,
   payload: unknown,
   validate: (data: unknown) => TResponse,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void
+  onCredits?: (balance: CreditBalance) => void,
+  onWorkflowId?: ConfirmWorkflowId
 ): Promise<TResponse> {
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Workflow-Id": workflowId,
     },
     body: JSON.stringify(payload),
   });
+
+  reportConfirmedWorkflowId(response, onWorkflowId);
 
   if (!response.ok || !response.body) {
     const json = (await response.json().catch(() => null)) as unknown;
@@ -97,85 +117,109 @@ async function postJsonStream<TResponse>(
 }
 
 export function generateTopics(
+  workflowId: string,
   input: MeteredInput<GenerateTopicsInput>,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void
+  onCredits?: (balance: CreditBalance) => void,
+  onWorkflowId?: ConfirmWorkflowId
 ): Promise<GenerateTopicsOutput> {
   return postJsonStream(
     "/api/ai/topics/stream",
+    workflowId,
     input,
     (data) => topicResponseSchema.parse(data),
     onProgress,
-    onCredits
+    onCredits,
+    onWorkflowId
   );
 }
 
 export function generateBrief(
+  workflowId: string,
   input: MeteredInput<GenerateBriefInput>,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void
+  onCredits?: (balance: CreditBalance) => void,
+  onWorkflowId?: ConfirmWorkflowId
 ): Promise<GenerateBriefOutput> {
   return postJsonStream(
     "/api/ai/brief/stream",
+    workflowId,
     input,
     (data) => briefResponseSchema.parse(data),
     onProgress,
-    onCredits
+    onCredits,
+    onWorkflowId
   );
 }
 
 export function generateOutline(
+  workflowId: string,
   input: MeteredInput<GenerateOutlineInput>,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void
+  onCredits?: (balance: CreditBalance) => void,
+  onWorkflowId?: ConfirmWorkflowId
 ): Promise<GenerateOutlineOutput> {
   return postJsonStream(
     "/api/ai/outline/stream",
+    workflowId,
     input,
     (data) => outlineResponseSchema.parse(data),
     onProgress,
-    onCredits
+    onCredits,
+    onWorkflowId
   );
 }
 
 export function generateDraft(
+  workflowId: string,
   input: MeteredInput<GenerateDraftInput>,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void
+  onCredits?: (balance: CreditBalance) => void,
+  onWorkflowId?: ConfirmWorkflowId
 ): Promise<GenerateDraftOutput> {
   return postJsonStream(
     "/api/ai/draft/stream",
+    workflowId,
     input,
     (data) => draftResponseSchema.parse(data),
     onProgress,
-    onCredits
+    onCredits,
+    onWorkflowId
   );
 }
 
 export function humanizeDraft(
+  workflowId: string,
   input: MeteredInput<HumanizeDraftInput>,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void
+  onCredits?: (balance: CreditBalance) => void,
+  onWorkflowId?: ConfirmWorkflowId
 ): Promise<HumanizeDraftOutput> {
   return postJsonStream(
     "/api/ai/humanize/stream",
+    workflowId,
     input,
     (data) => humanizeDraftResponseSchema.parse(data),
     onProgress,
-    onCredits
+    onCredits,
+    onWorkflowId
   );
 }
 
 export function generateTitlesAndSummaries(
+  workflowId: string,
   input: MeteredInput<GenerateTitlesAndSummariesInput>,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void
+  onCredits?: (balance: CreditBalance) => void,
+  onWorkflowId?: ConfirmWorkflowId
 ): Promise<GenerateTitlesAndSummariesOutput> {
   return postJsonStream(
     "/api/ai/meta/stream",
+    workflowId,
     input,
     (data) => metaResponseSchema.parse(data),
     onProgress,
-    onCredits
+    onCredits,
+    onWorkflowId
   );
 }

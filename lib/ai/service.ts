@@ -221,6 +221,7 @@ export async function generateTopics(
   let searchMs = 0;
 
   log.info("topics", "start", {
+    event: "topics.generation.started",
     ideaPreview: logPreview(input.idea),
     searchEnabled: Boolean(input.searchEnabled),
     aiProvider: getProviderName(),
@@ -244,6 +245,7 @@ export async function generateTopics(
       plannerSource = "fallback";
       topicPlan = buildFallbackTopicSearchPlan(input.idea);
       log.warn("topics", "search plan fallback", {
+        event: "search.plan.fallback",
         source: plannerSource,
         errorType: safeErrorType(error),
       });
@@ -251,6 +253,7 @@ export async function generateTopics(
     plannerMs = Date.now() - plannerStartedAt;
 
     log.debug("topics", "search plan", {
+      event: "search.plan.completed",
       source: plannerSource,
       elapsedMs: plannerMs,
       coreTopic: logPreview(topicPlan.coreTopic),
@@ -283,6 +286,7 @@ export async function generateTopics(
     searchResult?.status === "success" ? searchResult : null;
 
   log.info("topics", "reference context", {
+    event: "search.context.prepared",
     ...topicReferenceStats(searchContext),
     status: searchResult?.status ?? "disabled",
   });
@@ -310,6 +314,7 @@ export async function generateTopics(
   });
 
   log.info("topics", "completed", {
+    event: "topics.generation.completed",
     plannerMs,
     searchMs,
     generationMs,
