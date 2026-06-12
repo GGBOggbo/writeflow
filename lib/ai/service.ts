@@ -123,6 +123,43 @@ function topicReferenceStats(searchContext: SearchReferenceBundle | null) {
   };
 }
 
+function reusableSearchContext(
+  scope: "brief" | "outline" | "draft" | "meta",
+  searchEnabled: boolean | undefined,
+  searchContext: SearchReferenceBundle | null | undefined
+) {
+  const reusable =
+    searchEnabled && searchContext?.status === "success"
+      ? searchContext
+      : null;
+
+  if (!searchEnabled) {
+    log.info(scope, "search context disabled", {
+      event: "search.context.disabled",
+      stage: scope,
+    });
+    return null;
+  }
+
+  if (!reusable) {
+    log.warn(scope, "search context missing", {
+      event: "search.context.missing",
+      stage: scope,
+      status: searchContext?.status ?? "missing",
+    });
+    return null;
+  }
+
+  log.info(scope, "search context reused", {
+    event: "search.context.reused",
+    stage: scope,
+    ...topicReferenceStats(reusable),
+    status: reusable.status,
+  });
+
+  return reusable;
+}
+
 function getProvider(): AIProvider {
   const providerName = getProviderName();
 
@@ -371,10 +408,11 @@ export async function generateBrief(
   input: GenerateBriefInput,
   options?: { onProgress?: ProgressReporter }
 ): Promise<GenerateBriefOutput> {
-  const searchContext =
-    input.searchEnabled && input.searchContext?.status === "success"
-      ? input.searchContext
-      : null;
+  const searchContext = reusableSearchContext(
+    "brief",
+    input.searchEnabled,
+    input.searchContext
+  );
 
   options?.onProgress?.({
     stepId: "brief_generation_started",
@@ -400,10 +438,11 @@ export async function generateOutline(
   input: GenerateOutlineInput,
   options?: { onProgress?: ProgressReporter }
 ): Promise<GenerateOutlineOutput> {
-  const searchContext =
-    input.searchEnabled && input.searchContext?.status === "success"
-      ? input.searchContext
-      : null;
+  const searchContext = reusableSearchContext(
+    "outline",
+    input.searchEnabled,
+    input.searchContext
+  );
 
   options?.onProgress?.({
     stepId: "outline_generation_started",
@@ -430,10 +469,11 @@ export async function generateDraft(
   options?: { onProgress?: ProgressReporter }
 ): Promise<GenerateDraftOutput> {
   const provider = getProvider();
-  const searchContext =
-    input.searchEnabled && input.searchContext?.status === "success"
-      ? input.searchContext
-      : null;
+  const searchContext = reusableSearchContext(
+    "draft",
+    input.searchEnabled,
+    input.searchContext
+  );
   const enrichedSearchContext = await summarizeDraftBenchmarks(
     provider,
     searchContext,
@@ -503,10 +543,11 @@ export async function generateTitlesAndSummaries(
   input: GenerateTitlesAndSummariesInput,
   options?: { onProgress?: ProgressReporter }
 ): Promise<GenerateTitlesAndSummariesOutput> {
-  const searchContext =
-    input.searchEnabled && input.searchContext?.status === "success"
-      ? input.searchContext
-      : null;
+  const searchContext = reusableSearchContext(
+    "meta",
+    input.searchEnabled,
+    input.searchContext
+  );
 
   options?.onProgress?.({
     stepId: "meta_generation_started",

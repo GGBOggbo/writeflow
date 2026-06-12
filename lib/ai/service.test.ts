@@ -379,7 +379,9 @@ describe("AI service", () => {
     vi.stubEnv("MIMO_API_KEY", "test-key");
     vi.stubEnv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1");
     vi.stubEnv("MIMO_MODEL", "mimo-v2.5-pro");
+    vi.stubEnv("LOG_LEVEL", "info");
 
+    const capture = capturePinoOutput();
     const briefSearchSpy = vi.spyOn(searchService, "searchForBrief");
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -458,9 +460,56 @@ describe("AI service", () => {
     });
 
     expect(briefSearchSpy).not.toHaveBeenCalled();
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"event":"search.context.reused"');
+    expect(logs).toContain('"scope":"brief"');
+    expect(logs).toContain('"stage":"brief"');
+    expect(logs).toContain('"searchResults":1');
+    expect(logs).toContain('"promptReferences":1');
     expect(fetchSpy.mock.calls[0]?.[1]?.body).toEqual(
       expect.stringContaining("选题阶段拿到的公众号文章")
     );
+  });
+
+  it("logs when later stages cannot reuse topic search context", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.stubEnv("LOG_LEVEL", "info");
+    const capture = capturePinoOutput();
+
+    await generateBrief({
+      topicId: "topic-1",
+      topicLabel: "无搜索复用",
+      topicAngle: "直接生成",
+      coreViewpoint: "没有启用联网。",
+      targetAudience: "内容创作者",
+      reason: "测试日志。",
+      structureType: "清单干货型",
+      searchEnabled: false,
+    });
+    await generateOutline({
+      topicId: "topic-1",
+      topicLabel: "缺少上下文",
+      topicAngle: "需要提示",
+      coreViewpoint: "开了搜索但没上下文。",
+      targetAudience: "内容创作者",
+      reason: "测试日志。",
+      structureType: "清单干货型",
+      briefObjective: "测试",
+      briefAudience: "内容创作者",
+      briefPersona: "主编",
+      briefTone: "直接",
+      briefDropOffPoint: "看日志",
+      briefConstraints: [],
+      searchEnabled: true,
+    });
+
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"event":"search.context.disabled"');
+    expect(logs).toContain('"scope":"brief"');
+    expect(logs).toContain('"event":"search.context.missing"');
+    expect(logs).toContain('"scope":"outline"');
   });
 
   it("does not pass search context when search status is degraded", async () => {
