@@ -1,3 +1,5 @@
+export type { TopicSearchPlan } from "./topic-search-plan";
+
 export type SearchSource = "wechat" | "xiaohongshu" | "hotlist" | "generic";
 
 export type SearchIntent = "topics" | "brief" | "outline" | "meta";
