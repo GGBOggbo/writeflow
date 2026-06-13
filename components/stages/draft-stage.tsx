@@ -44,28 +44,31 @@ export function DraftStage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {state.draftVersions.map((draft) => {
-          const active = draft.id === activeDraft?.id;
-          return (
-            <button
-              key={draft.id}
-              type="button"
-              aria-pressed={active}
-              className={[
-                "rounded-full px-4 py-2 text-sm font-semibold transition",
-                active
-                  ? "bg-[#233044] text-stone-50"
-                  : "border border-[rgba(35,48,68,0.16)] bg-white text-[#233044] hover:bg-[#f3f7fb]",
-              ].join(" ")}
-              onClick={() => handleSelectDraft(draft.id)}
-              disabled={loading}
-            >
-              {draft.label}
-            </button>
-          );
-        })}
-      </div>
+      <fieldset>
+        <legend className="sr-only">选择版本</legend>
+        <div className="flex flex-wrap gap-2">
+          {state.draftVersions.map((draft) => {
+            const active = draft.id === activeDraft?.id;
+            return (
+              <button
+                key={draft.id}
+                type="button"
+                aria-pressed={active}
+                className={[
+                  "rounded-full px-4 py-2 text-sm font-semibold transition",
+                  active
+                    ? "bg-[#233044] text-stone-50"
+                    : "border border-[rgba(35,48,68,0.16)] bg-white text-[#233044] hover:bg-[#f3f7fb]",
+                ].join(" ")}
+                onClick={() => handleSelectDraft(draft.id)}
+                disabled={loading}
+              >
+                {draft.label}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-[28px] border border-[var(--line-soft)] bg-[#fcfdff] p-6 shadow-sm">

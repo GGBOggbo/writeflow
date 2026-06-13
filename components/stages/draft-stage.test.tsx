@@ -42,6 +42,10 @@ describe("DraftStage", () => {
 
     expect(await screen.findByRole("button", { name: "原稿" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "润色版" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "原稿" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
   });
 
   it("switches the displayed draft body when a version tab is selected", async () => {
