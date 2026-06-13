@@ -3,19 +3,16 @@
 import { useMemo, useState } from "react";
 import { copyRichHtml } from "@/lib/copy/copy-rich-html";
 import { renderWechatHtml } from "@/lib/formatting/render";
+import { WECHAT_THEME_TOKENS } from "@/lib/formatting/themes";
 import type {
   DraftFormatting,
   WechatFormatTheme,
 } from "@/types/workflow";
 
-const themeOptions: Array<{
-  id: WechatFormatTheme;
-  label: string;
-  swatch: string;
-}> = [
-  { id: "professional-blue", label: "专业蓝", swatch: "#2563eb" },
-  { id: "warm-orange", label: "温暖橙", swatch: "#ea580c" },
-  { id: "fresh-teal", label: "清爽青绿", swatch: "#0f766e" },
+const themeOptions: Array<{ id: WechatFormatTheme; label: string }> = [
+  { id: "professional-blue", label: "专业蓝" },
+  { id: "warm-orange", label: "温暖橙" },
+  { id: "fresh-teal", label: "清爽青绿" },
 ];
 
 export function WechatFormatPanel({
@@ -140,7 +137,9 @@ export function WechatFormatPanel({
                       >
                         <span
                           className="h-1.5 w-4 rounded-full"
-                          style={{ backgroundColor: theme.swatch }}
+                          style={{
+                            backgroundColor: WECHAT_THEME_TOKENS[theme.id].accent,
+                          }}
                           aria-hidden="true"
                         />
                         {theme.label}
