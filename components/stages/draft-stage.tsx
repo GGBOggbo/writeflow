@@ -2,6 +2,7 @@
 
 import { useWorkflowContext } from "../workflow-context";
 import { ProseText } from "../prose-text";
+import { WechatFormatPanel } from "../wechat-format-panel";
 
 export function DraftStage() {
   const {
@@ -11,6 +12,8 @@ export function DraftStage() {
     requestStatus,
     handleSelectDraft,
     handleHumanizeDraft,
+    handleFormatDraft,
+    handleSelectFormatTheme,
     handleGenerateMeta,
   } = useWorkflowContext();
 
@@ -22,6 +25,10 @@ export function DraftStage() {
   );
   const isHumanizing =
     loading && requestStatus?.action === "humanize_draft";
+  const isFormatting = loading && requestStatus?.action === "format_draft";
+  const activeFormatting = activeDraft
+    ? state.draftFormattingByVersion[activeDraft.id]
+    : undefined;
 
   return (
     <section className="space-y-6">
@@ -37,39 +44,50 @@ export function DraftStage() {
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
-        <div className="rounded-[28px] border border-[var(--line-soft)] bg-[rgba(252,253,255,0.98)] p-4 shadow-sm">
-          <p className="px-2 text-sm font-semibold text-stone-900">
-            版本管理
-          </p>
-          <div className="mt-4 space-y-2">
-            {state.draftVersions.map((draft) => {
-              const active = draft.id === activeDraft?.id;
+      <div className="flex flex-wrap gap-2">
+        {state.draftVersions.map((draft) => {
+          const active = draft.id === activeDraft?.id;
+          return (
+            <button
+              key={draft.id}
+              type="button"
+              aria-pressed={active}
+              className={[
+                "rounded-full px-4 py-2 text-sm font-semibold transition",
+                active
+                  ? "bg-[#233044] text-stone-50"
+                  : "border border-[rgba(35,48,68,0.16)] bg-white text-[#233044] hover:bg-[#f3f7fb]",
+              ].join(" ")}
+              onClick={() => handleSelectDraft(draft.id)}
+              disabled={loading}
+            >
+              {draft.label}
+            </button>
+          );
+        })}
+      </div>
 
-              return (
-                <button
-                  key={draft.id}
-                  type="button"
-                  className={[
-                    "w-full rounded-2xl px-4 py-3 text-left text-sm transition",
-                    active
-                      ? "border border-[rgba(35,48,68,0.16)] bg-[#e9f0f7] text-[#233044]"
-                      : "bg-stone-50 text-stone-700 hover:bg-stone-100",
-                  ].join(" ")}
-                  onClick={() => handleSelectDraft(draft.id)}
-                  disabled={loading}
-                >
-                  {draft.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
+      <div className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-[28px] border border-[var(--line-soft)] bg-[#fcfdff] p-6 shadow-sm">
           <p className="text-sm font-semibold text-stone-900">正文内容</p>
-          <ProseText content={activeDraft?.content ?? ""} className="mt-4 rounded-[24px] border border-[var(--line-soft)] bg-white/92 p-5 text-sm leading-7 text-stone-700" />
+          <ProseText
+            content={activeDraft?.content ?? ""}
+            className="mt-4 rounded-[24px] border border-[var(--line-soft)] bg-white/92 p-5 text-sm leading-7 text-stone-700"
+          />
         </div>
+
+        {activeDraft ? (
+          <WechatFormatPanel
+            key={activeDraft.id}
+            draftLabel={activeDraft.label}
+            formatting={activeFormatting}
+            loading={isFormatting}
+            disabled={loading}
+            canGenerate={canGenerate}
+            onGenerate={() => void handleFormatDraft()}
+            onThemeChange={handleSelectFormatTheme}
+          />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-3">
