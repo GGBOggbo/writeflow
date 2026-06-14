@@ -33,6 +33,16 @@ export function MetaStage() {
         </div>
       ) : null}
 
+      {state.coverImagePrompt ? (
+        <div className="rounded-[28px] border border-[var(--line-soft)] bg-[#fcfdff] p-6 shadow-sm">
+          <p className="text-sm font-semibold text-stone-900">封面生图提示词</p>
+          <p className="mt-1 text-xs text-stone-500">AI 生图用 · 900×383 封面</p>
+          <pre className="mt-3 whitespace-pre-wrap break-words font-mono text-xs leading-6 text-stone-700">
+            {state.coverImagePrompt}
+          </pre>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-[28px] border border-[var(--line-soft)] bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold text-stone-900">标题方案</p>
