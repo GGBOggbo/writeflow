@@ -8,7 +8,7 @@ import type {
   GenerateOutlineInput,
   GenerateOutlineOutput,
   GenerateTitlesAndSummariesInput,
-  GenerateTitlesAndSummariesOutput,
+  GenerateTitlesAndSummariesResult,
   GenerateTopicsInput,
   GenerateTopicsOutput,
 } from "@/types/ai";
@@ -22,6 +22,7 @@ import {
   outlineResponseSchema,
   topicResponseSchema,
 } from "./schemas";
+import { buildCoverImagePrompt } from "./prompts/cover-image";
 
 type MeteredInput<T> = T & {
   operationId: string;
@@ -212,12 +213,15 @@ export function generateTitlesAndSummaries(
   onProgress?: (event: WorkflowProgressEvent) => void,
   onCredits?: (balance: CreditBalance) => void,
   onWorkflowId?: ConfirmWorkflowId
-): Promise<GenerateTitlesAndSummariesOutput> {
+): Promise<GenerateTitlesAndSummariesResult> {
   return postJsonStream(
     "/api/ai/meta/stream",
     workflowId,
     input,
-    (data) => metaResponseSchema.parse(data),
+    (data) => {
+      const parsed = metaResponseSchema.parse(data);
+      return { ...parsed, coverImagePrompt: buildCoverImagePrompt(parsed.coverImageConcept) };
+    },
     onProgress,
     onCredits,
     onWorkflowId

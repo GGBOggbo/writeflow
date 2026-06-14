@@ -163,6 +163,11 @@ export type GenerateTitlesAndSummariesOutput = {
   titles: MetaCard[];
   summaries: MetaCard[];
   coverSuggestion: string;
-  coverImagePrompt: string;
+  coverImageConcept?: CoverImageConcept;
   searchStatus?: SearchBundleStatus;
+};
+
+/** Frontend-enriched result: raw output + the assembled cover image prompt. */
+export type GenerateTitlesAndSummariesResult = GenerateTitlesAndSummariesOutput & {
+  coverImagePrompt: string;
 };

@@ -1982,8 +1982,8 @@ describe("AI service", () => {
 
     expect(result.titles[0]?.content).toContain("主流程");
     expect(result.coverSuggestion).toContain("真实产品流程图");
-    expect(result.coverImagePrompt).toContain("清晨空荡的办公室");
-    expect(result.coverImagePrompt).toContain("#f5f1e8");
+    expect(result.coverImageConcept?.visualConcept).toBe("清晨空荡的办公室，亮屏笔记本与散落便签");
+    expect(result.coverImageConcept?.titleOverlay).toBe("title");
     expect(fetchSpy.mock.calls[0]?.[1]?.body).toEqual(
       expect.stringContaining("工程推进视角")
     );
