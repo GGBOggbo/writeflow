@@ -1987,5 +1987,8 @@ describe("AI service", () => {
     expect(fetchSpy.mock.calls[0]?.[1]?.body).toEqual(
       expect.stringContaining("工程推进视角")
     );
+    expect(fetchSpy.mock.calls[0]?.[1]?.body).toEqual(
+      expect.stringContaining("coverImageConcept")
+    );
   });
 });

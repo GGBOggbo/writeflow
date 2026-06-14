@@ -172,7 +172,7 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
       callMimo(input, config, defaults, {
         buildPrompt: buildMetaPrompt,
         jsonHint:
-          '{"titles":[{"id":"string","label":"利益结果型","content":"string"},{"id":"string","label":"场景痛点型","content":"string"},{"id":"string","label":"反常识/认知冲突型","content":"string"},{"id":"string","label":"新机会趋势型","content":"string"},{"id":"string","label":"个人故事/实录型","content":"string"}],"summaries":[{"id":"string","label":"痛点共鸣版","content":"string"},{"id":"string","label":"悬念反转版","content":"string"},{"id":"string","label":"专业克制版","content":"string"}],"coverSuggestion":"string"}',
+          '{"titles":[{"id":"string","label":"利益结果型","content":"string"},{"id":"string","label":"场景痛点型","content":"string"},{"id":"string","label":"反常识/认知冲突型","content":"string"},{"id":"string","label":"新机会趋势型","content":"string"},{"id":"string","label":"个人故事/实录型","content":"string"}],"summaries":[{"id":"string","label":"痛点共鸣版","content":"string"},{"id":"string","label":"悬念反转版","content":"string"},{"id":"string","label":"专业克制版","content":"string"}],"coverSuggestion":"string","coverImageConcept":{"visualConcept":"string","mood":"string","focalObject":"string","palette":"string","titleOverlay":"none","customNegatives":"string"}}',
         maxTokens: 1200,
         temperature: 0.75,
         schema: metaResponseSchema,
