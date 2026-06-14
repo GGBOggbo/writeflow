@@ -120,16 +120,12 @@ function renderBlock(block: FormattingBlock, theme: WechatFormatTheme) {
     case "heading":
       return renderHeading(block.text, theme);
     case "quote": {
-      const quoteMark = (offset: string) =>
-        `<span style="font-size:28px;color:${tokens.accent};line-height:0;vertical-align:${offset};">&ldquo;</span>`;
       const inner = renderMarkdown(
         block.text,
         theme,
         `margin:0;font-family:${tokens.headingFont} !important;font-size:18px;font-weight:700;line-height:1.85;color:${tokens.quoteText};`
       );
-      return `<section data-format-block="quote" style="margin:32px 0;padding:20px 22px;background:${tokens.quoteBackground};border-left:5px solid ${tokens.quoteBorder};box-shadow:${tokens.cardShadow};border-radius:${tokens.cardRadius};text-align:left;">${quoteMark(
-        "-6px"
-      )}${inner}${quoteMark("-10px")}</section>`;
+      return `<section data-format-block="quote" style="margin:32px 0;padding:20px 22px;background:${tokens.quoteBackground};border-left:5px solid ${tokens.quoteBorder};box-shadow:${tokens.cardShadow};border-radius:${tokens.cardRadius};text-align:left;">${inner}</section>`;
     }
     case "pain": {
       const inner = renderMarkdown(

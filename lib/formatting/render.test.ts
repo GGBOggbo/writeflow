@@ -69,8 +69,20 @@ describe("renderWechatHtml", () => {
     expect(html).toContain("border-radius:");
     expect(html).toContain("box-shadow:");
     expect(html).not.toContain("background:transparent");
-    // quote-mark decoration
-    expect(html).toMatch(/["“]/);
+    // restraint: no decorative quote-mark wrapping on quote cards
+    expect(html).not.toContain("&ldquo;");
+  });
+
+  it("renders cta with white inner text for contrast on the dark gradient", () => {
+    const html = renderWechatHtml(
+      [{ id: "cta", type: "cta", text: "你准备先改哪一步？" }],
+      "professional-blue"
+    );
+
+    expect(html).toContain('data-format-block="cta"');
+    const ctaSection =
+      html.match(/data-format-block="cta"[^]*?<\/section>/)?.[0] ?? "";
+    expect(ctaSection).toContain("color:#ffffff");
   });
 
   it("renders heading as a polished card for warm orange emphasis", () => {

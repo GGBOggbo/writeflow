@@ -59,4 +59,20 @@ describe("buildFormatDraftPrompt", () => {
     expect(prompt.userPrompt).toContain("自然衔接不算 transition");
     expect(prompt.userPrompt).toContain("全文最多 1 个 cta");
   });
+
+  it("caps quote and transition frequency and calms the first screen", () => {
+    const prompt = buildFormatDraftPrompt({
+      draftVersionId: "draft-1",
+      content: "第一段。\n\n第二段。",
+    });
+
+    // quote cap
+    expect(prompt.userPrompt).toContain("5-7");
+    expect(prompt.userPrompt).toContain("稀缺重点");
+    // transition cap
+    expect(prompt.userPrompt).toContain("章节转场");
+    expect(prompt.userPrompt).toContain("4-6");
+    // calm first screen rule
+    expect(prompt.userPrompt).toContain("首屏克制");
+  });
 });
