@@ -19,6 +19,8 @@ describe("workflow final selection defaults", () => {
         { id: "summary-2", label: "悬念反转版", content: "摘要 B" },
         { id: "summary-3", label: "专业克制版", content: "摘要 C" },
       ],
+      coverSuggestion: "取材建议",
+      coverImagePrompt: "【公众号封面 · 900×383】画面概念：清晨办公室",
     });
 
     expect(next.finalSelection.titleId).toBe("title-1");

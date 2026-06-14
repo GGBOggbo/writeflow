@@ -49,6 +49,7 @@ export function createInitialWorkflowState(): WorkflowState {
     titleOptions: [],
     summaryOptions: [],
     coverSuggestion: null,
+    coverImagePrompt: null,
     finalSelection: {
       draftVersionId: null,
       titleId: null,
@@ -81,6 +82,7 @@ export function transitionWorkflow(
         titleOptions: [],
         summaryOptions: [],
         coverSuggestion: null,
+        coverImagePrompt: null,
         finalSelection: {
           draftVersionId: null,
           titleId: null,
@@ -103,6 +105,7 @@ export function transitionWorkflow(
         titleOptions: [],
         summaryOptions: [],
         coverSuggestion: null,
+        coverImagePrompt: null,
         finalSelection: {
           draftVersionId: null,
           titleId: null,
@@ -161,6 +164,7 @@ export function transitionWorkflow(
         titleOptions: event.titles,
         summaryOptions: event.summaries,
         coverSuggestion: event.coverSuggestion,
+        coverImagePrompt: event.coverImagePrompt,
         finalSelection: {
           ...state.finalSelection,
           titleId: event.titles[0]?.id ?? null,

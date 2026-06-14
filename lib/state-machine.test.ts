@@ -367,11 +367,14 @@ describe("workflow state machine", () => {
         { id: "summary-2", label: "悬念反转版", content: "摘要 2" },
         { id: "summary-3", label: "专业克制版", content: "摘要 3" },
       ],
+      coverSuggestion: "取材建议",
+      coverImagePrompt: "【公众号封面 · 900×383】画面概念：清晨办公室",
     });
 
     expect(next.currentStep).toBe("meta_review");
     expect(next.titleOptions).toHaveLength(5);
     expect(next.summaryOptions).toHaveLength(3);
+    expect(next.coverImagePrompt).toBe("【公众号封面 · 900×383】画面概念：清晨办公室");
   });
 });
 

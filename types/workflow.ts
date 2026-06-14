@@ -89,6 +89,7 @@ export type WorkflowState = {
   titleOptions: MetaCard[];
   summaryOptions: MetaCard[];
   coverSuggestion: string | null;
+  coverImagePrompt: string | null;
   finalSelection: {
     draftVersionId: string | null;
     titleId: string | null;
@@ -124,6 +125,7 @@ export type WorkflowEvent =
       titles: MetaCard[];
       summaries: MetaCard[];
       coverSuggestion: string;
+      coverImagePrompt: string;
     }
   | { type: "final_version_selected"; draftVersionId: string }
   | { type: "final_title_selected"; titleId: string }
