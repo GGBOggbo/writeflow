@@ -231,6 +231,13 @@ export const mockAIProvider: AIProvider = {
       ],
       coverSuggestion:
         "封面优先用真实工作台截图、流程图或数据界面截图，避免空泛科技感插画；如果没有截图，就用能体现具体场景的实拍图。",
+      coverImageConcept: {
+        visualConcept: "清晨空荡的办公室，亮屏笔记本与散落便签",
+        mood: "冷调晨光，低饱和，胶片质感",
+        focalObject: "笔记本屏幕",
+        palette: "墨黑 + 暖纸米色 + 一点静默蓝绿",
+        titleOverlay: "title",
+      },
     };
   },
 };

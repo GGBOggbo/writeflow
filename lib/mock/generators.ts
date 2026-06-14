@@ -116,7 +116,7 @@ export async function generateMeta(
   briefPersona = "一个踩过坑、愿意把流程讲透的实战派前辈",
   briefDropOffPoint = `让读者记住围绕 ${topicId} 最关键的判断，并愿意开始下一步行动。`,
   draftContent = `围绕 ${topicId} 讲清楚为什么先跑通主流程。`
-) : Promise<{ titles: MetaCard[]; summaries: MetaCard[]; coverSuggestion: string }> {
+) : Promise<{ titles: MetaCard[]; summaries: MetaCard[]; coverSuggestion: string; coverImageConcept?: import("@/types/ai").CoverImageConcept }> {
   return mockAIProvider.generateTitlesAndSummaries({
     topicLabel,
     coreViewpoint,
