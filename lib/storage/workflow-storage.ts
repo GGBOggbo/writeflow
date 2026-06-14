@@ -105,6 +105,10 @@ function normalizeWorkflowState(
       typeof rawState.coverSuggestion === "string"
         ? rawState.coverSuggestion
         : baseState.coverSuggestion,
+    coverImagePrompt:
+      typeof rawState.coverImagePrompt === "string"
+        ? rawState.coverImagePrompt
+        : baseState.coverImagePrompt,
     finalSelection: {
       draftVersionId:
         rawState.finalSelection?.draftVersionId ??

@@ -593,6 +593,7 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
           titles: result.titles,
           summaries: result.summaries,
           coverSuggestion: result.coverSuggestion,
+          coverImagePrompt: result.coverImagePrompt,
         })
       );
       const notice = getSearchStatusNotice(result.searchStatus);
