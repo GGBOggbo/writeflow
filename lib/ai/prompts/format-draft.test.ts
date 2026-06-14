@@ -57,6 +57,6 @@ describe("buildFormatDraftPrompt", () => {
     expect(prompt.userPrompt).toContain("情绪爆点和反问不算金句");
     expect(prompt.userPrompt).toContain("作者立场不是痛点");
     expect(prompt.userPrompt).toContain("自然衔接不算 transition");
-    expect(prompt.userPrompt).toContain("正文中间的提问不算 cta");
+    expect(prompt.userPrompt).toContain("全文最多 1 个 cta");
   });
 });

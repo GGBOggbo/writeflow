@@ -42,7 +42,7 @@ export function buildFormatDraftPrompt(
       "list：连续短列表",
       "comparison：明确的对比内容",
       "cta：结尾行动号召或互动提问。",
-      "  避：只在收尾用；正文中间的提问不算 cta。",
+      "  避：全文最多 1 个 cta，必须是结尾最后那段最明确的行动号召；正文中间的号召、提问、引导不要标 cta（按 transition 或 paragraph 处理）。",
       "",
       "=== 绝对边界 ===",
       "1. 原文必须逐字保留，不得改写；只返回每段的编号和类型，不要回传正文文本。",
