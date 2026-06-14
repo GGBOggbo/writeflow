@@ -134,7 +134,9 @@ export const metaResponseSchema = z.object({
 | 越大越细(字重随字号降) ([components.md]) | 模板压字字重 | 400-500,非 700+ |
 | 文字不压焦点 / 缩略图可读 ([image-overlay.md Step 4]) | 模板压字落点 | 落安静区、左对齐 |
 
-## 7. 精确改动清单(17 处,3 个雷点)
+## 7. 精确改动清单(18 处,3 个雷点)
+
+> 2026-06-14 复核:代码更新后重新核对,real-provider 已重构为 spec 配置驱动(jsonHint 从 L196 移到 L209-210,在 `callMimo` 配置对象内);新发现 `lib/mock/generators.ts:107 generateMeta()` 需同步。其余 16 处行号零位移,方案不变。
 
 ### 7.1 服务端链(新增 prompt 产出)
 
@@ -145,7 +147,8 @@ export const metaResponseSchema = z.object({
 | `lib/ai/prompts/meta.ts` | +一段指令让模型吐 coverImageConcept(独立于证据链那段,强调可不带人、按内容判 titleOverlay) | — |
 | **`lib/ai/prompts/cover-image.ts`** | **新文件**:`buildCoverImagePrompt(concept)` 纯函数 + fallback | 核心实现 |
 | `lib/ai/prompts/cover-image.test.ts` | 新测试:overlay 三分支 + customNegatives + undefined fallback | — |
-| `lib/ai/real-provider.ts` | `jsonHint` 字符串(L196)加 `coverImageConcept` | **雷点 1:漏改则真模型不吐** |
+| `lib/ai/real-provider.ts` | `callMimo` 的 meta 配置对象(L206-215)里 `jsonHint` 字符串(L209-210)加 `coverImageConcept`;同对象 `schema` 已是 `metaResponseSchema`(会自动带上新字段) | **雷点 1:漏改 jsonHint 则真模型不吐**。注:该文件已重构为 spec 配置驱动,meta 的 `buildPrompt`/`jsonHint`/`schema` 在同一对象,改动更集中 |
+| `lib/mock/generators.ts:107` | `generateMeta()` 返回类型加 `coverImageConcept`(与 mockAIProvider 对齐)。**只加概念,不在此组装 coverImagePrompt**(它是 service 层职责,这里是 provider 薄封装) | 新发现的遗漏点;当前零消费者,低风险 |
 | `lib/ai/mock-provider.ts` | `generateTitlesAndSummaries` 返回加样例 concept | — |
 | `lib/ai/service.ts` | `generateTitlesAndSummaries` parse 后调 `buildCoverImagePrompt`,挂到 output | — |
 | `lib/ai/prompts/meta.test.ts` | +断言新指令块存在 | — |
