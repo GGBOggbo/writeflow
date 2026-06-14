@@ -43,6 +43,7 @@ import {
   topicResponseSchema,
 } from "./schemas";
 import { formatSearchReference } from "./prompts/search-context";
+import { buildCoverImagePrompt } from "./prompts/cover-image";
 
 function logPreview(value: string, limit = 120) {
   return value.replace(/[\n\r\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, limit);
@@ -563,8 +564,10 @@ export async function generateTitlesAndSummaries(
     label: "生成标题摘要完成",
   });
 
-  return metaResponseSchema.parse({
+  const { coverImageConcept, ...rest } = metaResponseSchema.parse({
     ...providerResult,
     searchStatus: searchContext?.status,
   });
+  const coverImagePrompt = buildCoverImagePrompt(coverImageConcept);
+  return { ...rest, coverImagePrompt };
 }

@@ -302,9 +302,19 @@ export const metaRequestSchema = z.object({
   searchContext: searchReferenceBundleSchema.nullable().optional(),
 });
 
+export const coverImageConceptSchema = z.object({
+  visualConcept: z.string().trim().min(1),
+  mood: z.string().trim().min(1),
+  focalObject: z.string().trim().min(1),
+  palette: z.string().trim().min(1),
+  titleOverlay: z.enum(["none", "tag", "title"]),
+  customNegatives: z.string().trim().min(1).optional(),
+});
+
 export const metaResponseSchema = z.object({
   titles: z.array(metaCardSchema).length(5),
   summaries: z.array(metaCardSchema).length(3),
   coverSuggestion: z.string().trim().min(1),
+  coverImageConcept: coverImageConceptSchema.optional(),
   searchStatus: searchStatusSchema,
 });

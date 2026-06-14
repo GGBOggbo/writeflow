@@ -163,5 +163,6 @@ export type GenerateTitlesAndSummariesOutput = {
   titles: MetaCard[];
   summaries: MetaCard[];
   coverSuggestion: string;
+  coverImagePrompt: string;
   searchStatus?: SearchBundleStatus;
 };

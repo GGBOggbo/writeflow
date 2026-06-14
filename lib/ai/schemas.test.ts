@@ -168,4 +168,39 @@ describe("AI schemas", () => {
       })
     ).toThrow();
   });
+
+  const metaResponseBase = {
+    titles: [
+      { id: "title-1", label: "利益结果型", content: "标题 1" },
+      { id: "title-2", label: "场景痛点型", content: "标题 2" },
+      { id: "title-3", label: "反常识/认知冲突型", content: "标题 3" },
+      { id: "title-4", label: "新机会趋势型", content: "标题 4" },
+      { id: "title-5", label: "个人故事/实录型", content: "标题 5" },
+    ],
+    summaries: [
+      { id: "summary-1", label: "痛点共鸣版", content: "摘要 1" },
+      { id: "summary-2", label: "悬念反转版", content: "摘要 2" },
+      { id: "summary-3", label: "专业克制版", content: "摘要 3" },
+    ],
+    coverSuggestion: "取材建议",
+  };
+
+  it("accepts coverImageConcept when present", () => {
+    const parsed = metaResponseSchema.parse({
+      ...metaResponseBase,
+      coverImageConcept: {
+        visualConcept: "清晨办公室",
+        mood: "冷调晨光",
+        focalObject: "笔记本屏幕",
+        palette: "墨黑+暖纸",
+        titleOverlay: "title",
+      },
+    });
+    expect(parsed.coverImageConcept?.titleOverlay).toBe("title");
+  });
+
+  it("accepts meta response without coverImageConcept (optional)", () => {
+    const parsed = metaResponseSchema.parse(metaResponseBase);
+    expect(parsed.coverImageConcept).toBeUndefined();
+  });
 });

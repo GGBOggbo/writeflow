@@ -1948,6 +1948,13 @@ describe("AI service", () => {
                   ],
                   coverSuggestion:
                     "封面优先用真实产品流程图或后台截图，避免空泛科技感插画。",
+                  coverImageConcept: {
+                    visualConcept: "清晨空荡的办公室，亮屏笔记本与散落便签",
+                    mood: "冷调晨光，低饱和",
+                    focalObject: "笔记本屏幕",
+                    palette: "墨黑 + 暖纸米色",
+                    titleOverlay: "title",
+                  },
                 }),
                 role: "assistant",
               },
@@ -1975,6 +1982,8 @@ describe("AI service", () => {
 
     expect(result.titles[0]?.content).toContain("主流程");
     expect(result.coverSuggestion).toContain("真实产品流程图");
+    expect(result.coverImagePrompt).toContain("清晨空荡的办公室");
+    expect(result.coverImagePrompt).toContain("#f5f1e8");
     expect(fetchSpy.mock.calls[0]?.[1]?.body).toEqual(
       expect.stringContaining("工程推进视角")
     );
