@@ -275,7 +275,11 @@ function renderGallery(node: AdvancedModuleNode) {
 
 function renderLongImage(node: AdvancedModuleNode) {
   const [item] = extractMarkdownImages(node.body);
-  return shell(node, `${moduleHeading(node)}${item ? image(item.src, item.alt) : ""}${item ? `<p style="margin:8px 0 0;color:${T.colors.muted};font-size:12px;text-align:center;">${escapeHtml(item.alt)}</p>` : ""}`, "padding:18px;");
+  return shell(
+    node,
+    `${moduleHeading(node)}${item ? `<div style="max-height:520px;overflow-y:auto;overscroll-behavior:contain;border:1px solid ${T.colors.border};border-radius:${T.radius.medium};background:${T.colors.accentPale};">${image(item.src, item.alt, "border-radius:0;")}</div>` : ""}${item ? `<p style="margin:8px 0 0;color:${T.colors.muted};font-size:12px;text-align:center;">上下滑动查看 · ${escapeHtml(item.alt)}</p>` : ""}`,
+    "padding:18px;"
+  );
 }
 
 function renderDialogue(node: AdvancedModuleNode) {

@@ -286,4 +286,13 @@ describe("renderAdvancedModule", () => {
     expect(safeLink).toContain('href="https://example.com/tool"');
     expect(unsafe).not.toContain("javascript:");
   });
+
+  it("renders long images inside a bounded vertical preview viewer", () => {
+    const html = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.longimage.markdown)
+    );
+
+    expect(html).toContain("max-height:");
+    expect(html).toContain("overflow-y:auto");
+  });
 });
