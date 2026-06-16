@@ -13,5 +13,10 @@ export default async function Home() {
     ? await creditStore.getBalance(session.user.id)
     : null;
 
-  return <AppClient initialCreditBalance={initialCreditBalance} />;
+  return (
+    <AppClient
+      initialCreditBalance={initialCreditBalance}
+      currentUserId={session?.user?.id ?? null}
+    />
+  );
 }

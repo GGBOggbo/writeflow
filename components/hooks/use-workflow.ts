@@ -72,7 +72,10 @@ function createOperationId() {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
+export function useWorkflow(
+  initialCreditBalance: CreditBalance | null = null,
+  storageOwnerKey: string | null = null
+) {
   const [state, setState] = useState<WorkflowState>(createInitialWorkflowState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,18 +97,18 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
   // -- localStorage persistence --
 
   useEffect(() => {
-    const restored = loadWorkflowState();
+    const restored = loadWorkflowState(storageOwnerKey);
 
     if (restored) {
       queueMicrotask(() => {
         setState(restored);
       });
     }
-  }, []);
+  }, [storageOwnerKey]);
 
   useEffect(() => {
-    saveWorkflowState(state);
-  }, [state]);
+    saveWorkflowState(state, storageOwnerKey);
+  }, [state, storageOwnerKey]);
 
   // -- Internal helpers --
 
@@ -843,7 +846,7 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
 
   const handleConfirmResetWorkflow = () => {
     cancelPendingRequests();
-    clearWorkflowState();
+    clearWorkflowState(storageOwnerKey);
     setState(createInitialWorkflowState());
     setError(null);
     setLastFailedRequest(null);

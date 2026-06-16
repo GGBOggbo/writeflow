@@ -42,6 +42,29 @@ describe("AppClient", () => {
     expect(await screen.findByText(/选题会：选出最值得展开的切口/i)).toBeInTheDocument();
   });
 
+  it("starts a fresh workflow for a different authenticated user", async () => {
+    window.localStorage.setItem(
+      "ai-writing-mvp-workflow",
+      JSON.stringify({
+        currentStep: "draft_review",
+        ideaInput: "上一个账号的旧稿",
+        draftVersions: [
+          {
+            id: "draft-1",
+            label: "原始版",
+            content: "不应该出现在新账号里",
+          },
+        ],
+        selectedDraftVersionId: "draft-1",
+      })
+    );
+
+    render(<AppClient currentUserId="new-user" />);
+
+    expect(await screen.findByLabelText(/核心想法/i)).toHaveValue("");
+    expect(screen.queryByText("不应该出现在新账号里")).not.toBeInTheDocument();
+  });
+
   it("shows a generation timeline while a request is running", async () => {
     const user = userEvent.setup();
     let resolveRequest: (response: Response) => void = () => {};

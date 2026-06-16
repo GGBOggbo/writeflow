@@ -16,20 +16,34 @@ const LEGACY_PLACEHOLDER_DROP_OFF_POINT =
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function saveWorkflowState(state: WorkflowState) {
+export function getWorkflowStorageKey(ownerKey?: string | null) {
+  if (!ownerKey) {
+    return STORAGE_KEY;
+  }
+
+  return `${STORAGE_KEY}:${encodeURIComponent(ownerKey)}`;
+}
+
+export function saveWorkflowState(
+  state: WorkflowState,
+  ownerKey?: string | null
+) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  window.localStorage.setItem(
+    getWorkflowStorageKey(ownerKey),
+    JSON.stringify(state)
+  );
 }
 
-export function loadWorkflowState(): WorkflowState | null {
+export function loadWorkflowState(ownerKey?: string | null): WorkflowState | null {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  const raw = window.localStorage.getItem(getWorkflowStorageKey(ownerKey));
 
   if (!raw) {
     return null;
@@ -42,12 +56,12 @@ export function loadWorkflowState(): WorkflowState | null {
   }
 }
 
-export function clearWorkflowState() {
+export function clearWorkflowState(ownerKey?: string | null) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem(getWorkflowStorageKey(ownerKey));
 }
 
 function normalizeWorkflowState(

@@ -37,6 +37,27 @@ describe("workflow storage", () => {
     expect(restored?.workflowId).toBe(state.workflowId);
   });
 
+  it("keeps authenticated workflow state isolated by user", () => {
+    const userAState = createInitialWorkflowState();
+    userAState.ideaInput = "用户 A 的稿件";
+    const userBState = createInitialWorkflowState();
+    userBState.ideaInput = "用户 B 的稿件";
+
+    saveWorkflowState(userAState, "user-a");
+    saveWorkflowState(userBState, "user-b");
+
+    expect(loadWorkflowState("user-a")?.ideaInput).toBe("用户 A 的稿件");
+    expect(loadWorkflowState("user-b")?.ideaInput).toBe("用户 B 的稿件");
+  });
+
+  it("does not restore legacy anonymous workflow state for authenticated users", () => {
+    const legacy = createInitialWorkflowState();
+    legacy.ideaInput = "旧账号留在浏览器里的稿件";
+    saveWorkflowState(legacy);
+
+    expect(loadWorkflowState("new-user")).toBeNull();
+  });
+
   it("adds a workflow id when restoring legacy state", () => {
     const legacy = createInitialWorkflowState() as Partial<ReturnType<typeof createInitialWorkflowState>>;
     delete legacy.workflowId;

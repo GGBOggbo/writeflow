@@ -11,11 +11,13 @@ const WorkflowContext = createContext<WorkflowContextValue | null>(null);
 export function WorkflowProvider({
   children,
   initialCreditBalance = null,
+  storageOwnerKey = null,
 }: {
   children: ReactNode;
   initialCreditBalance?: CreditBalance | null;
+  storageOwnerKey?: string | null;
 }) {
-  const workflow = useWorkflow(initialCreditBalance);
+  const workflow = useWorkflow(initialCreditBalance, storageOwnerKey);
   return (
     <WorkflowContext.Provider value={workflow}>
       {children}
