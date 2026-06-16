@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+
+type AuthMode = "signin" | "signup";
+type LoadingAction = "email" | "reset" | "github" | "google" | null;
 
 const PROVIDERS = [
   {
@@ -27,70 +31,281 @@ const PROVIDERS = [
   },
 ] as const;
 
+function getAuthErrorMessage(message?: string) {
+  if (!message) {
+    return "操作失败，请稍后重试。";
+  }
+
+  if (message.includes("EMAIL_NOT_VERIFIED")) {
+    return "邮箱还未验证，验证邮件已经重新发送，请先打开邮箱完成验证。";
+  }
+
+  if (message.includes("Invalid email or password")) {
+    return "邮箱或密码不正确。";
+  }
+
+  return message;
+}
+
 export default function LoginPage() {
-  const [loading, setLoading] = useState<string | null>(null);
+  const router = useRouter();
+  const [mode, setMode] = useState<AuthMode>("signin");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState<LoadingAction>(null);
+  const isBusy = loading !== null;
+
+  const switchMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setError("");
+    setNotice("");
+  };
+
+  const handleEmailSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    setLoading("email");
+
+    try {
+      if (mode === "signup") {
+        const result = await authClient.signUp.email({
+          name,
+          email,
+          password,
+          callbackURL: "/",
+        });
+
+        if (result.error) {
+          setError(getAuthErrorMessage(result.error.message));
+          return;
+        }
+
+        setNotice("验证邮件已经发送，请打开邮箱完成验证后再登录。");
+        return;
+      }
+
+      const result = await authClient.signIn.email({
+        email,
+        password,
+        callbackURL: "/",
+      });
+
+      if (result.error) {
+        setError(getAuthErrorMessage(result.error.message));
+        return;
+      }
+
+      router.push("/");
+    } catch {
+      setError("操作失败，请稍后重试。");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setError("");
+    setNotice("");
+
+    if (!email) {
+      setError("请先填写邮箱。");
+      return;
+    }
+
+    setLoading("reset");
+
+    try {
+      const result = await authClient.requestPasswordReset({
+        email,
+        redirectTo: "/reset-password",
+      });
+
+      if (result.error) {
+        setError(getAuthErrorMessage(result.error.message));
+        return;
+      }
+
+      setNotice("如果这个邮箱存在，我们已经发送了重置密码邮件。");
+    } catch {
+      setError("重置邮件发送失败，请稍后重试。");
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleSocialLogin = async (provider: "github" | "google") => {
+    setError("");
+    setNotice("");
     setLoading(provider);
     await authClient.signIn.social({
       provider,
       callbackURL: "/",
     });
+    setLoading(null);
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4">
-      <div className="w-full max-w-[360px]">
-        {/* 品牌区域 */}
+      <div className="w-full max-w-[420px]">
         <div className="mb-8 text-center">
-          <p
-            className="editorial-kicker text-xs font-semibold text-[var(--accent-warm)]"
-            style={{ letterSpacing: "0.28em", textTransform: "uppercase" }}
-          >
+          <p className="editorial-kicker text-xs font-semibold text-[var(--accent-warm)]">
             主编陪跑型工作台
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--accent-ink)]">
+          <h1 className="mt-3 text-3xl font-semibold text-[var(--accent-ink)]">
             AI 共创工作台
           </h1>
           <p className="editorial-copy mt-3 text-sm text-stone-600">
-            把一个想法逐步打磨成可发布稿件
+            用邮箱或第三方账号进入你的成稿工作台
           </p>
         </div>
 
-        {/* 登录卡片 — 匹配 editorial-card-strong 风格 */}
-        <div
-          className="editorial-card-strong editorial-texture relative overflow-hidden rounded-[36px] px-6 py-8"
-        >
+        <div className="editorial-card-strong editorial-texture relative overflow-hidden rounded-[32px] px-5 py-6 sm:px-6">
           <div className="absolute inset-y-0 right-0 hidden w-[34%] bg-[radial-gradient(circle_at_top_right,rgba(207,220,235,0.5),transparent_58%),linear-gradient(180deg,rgba(255,255,255,0.32),transparent)] lg:block" />
 
           <div className="relative">
-            <p className="mb-5 text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-500">
-              选择登录方式
-            </p>
+            <div className="mb-5 grid grid-cols-2 rounded-full border border-[rgba(35,48,68,0.08)] bg-white/70 p-1">
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className={[
+                  "min-h-10 rounded-full text-sm font-semibold transition",
+                  mode === "signin"
+                    ? "bg-[#233044] text-white shadow-sm"
+                    : "text-stone-500 hover:bg-white hover:text-[#233044]",
+                ].join(" ")}
+              >
+                登录
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode("signup")}
+                className={[
+                  "min-h-10 rounded-full text-sm font-semibold transition",
+                  mode === "signup"
+                    ? "bg-[#233044] text-white shadow-sm"
+                    : "text-stone-500 hover:bg-white hover:text-[#233044]",
+                ].join(" ")}
+              >
+                注册
+              </button>
+            </div>
 
-            <div className="flex flex-col gap-2.5">
-              {PROVIDERS.map((p, i) => (
+            <form className="space-y-3" onSubmit={handleEmailSubmit}>
+              {mode === "signup" ? (
+                <label className="block text-sm font-medium text-[#233044]">
+                  昵称
+                  <input
+                    autoComplete="name"
+                    className="mt-1.5 w-full rounded-[18px] border border-[rgba(35,48,68,0.1)] bg-white/90 px-4 py-3 text-sm text-[#233044] outline-none transition placeholder:text-stone-400 focus:border-[rgba(95,121,147,0.4)] focus:ring-4 focus:ring-[rgba(95,121,147,0.12)]"
+                    disabled={isBusy}
+                    minLength={1}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="例如：内容主理人"
+                    required
+                    type="text"
+                    value={name}
+                  />
+                </label>
+              ) : null}
+
+              <label className="block text-sm font-medium text-[#233044]">
+                邮箱
+                <input
+                  autoComplete="email"
+                  className="mt-1.5 w-full rounded-[18px] border border-[rgba(35,48,68,0.1)] bg-white/90 px-4 py-3 text-sm text-[#233044] outline-none transition placeholder:text-stone-400 focus:border-[rgba(95,121,147,0.4)] focus:ring-4 focus:ring-[rgba(95,121,147,0.12)]"
+                  disabled={isBusy}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  type="email"
+                  value={email}
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-[#233044]">
+                密码
+                <input
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  className="mt-1.5 w-full rounded-[18px] border border-[rgba(35,48,68,0.1)] bg-white/90 px-4 py-3 text-sm text-[#233044] outline-none transition placeholder:text-stone-400 focus:border-[rgba(95,121,147,0.4)] focus:ring-4 focus:ring-[rgba(95,121,147,0.12)]"
+                  disabled={isBusy}
+                  minLength={8}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="至少 8 位"
+                  required
+                  type="password"
+                  value={password}
+                />
+              </label>
+
+              {error ? (
+                <p className="rounded-[18px] border border-[rgba(184,108,95,0.22)] bg-[#fff4f1] px-4 py-3 text-sm text-[#9c2a25]">
+                  {error}
+                </p>
+              ) : null}
+
+              {notice ? (
+                <p className="rounded-[18px] border border-[rgba(108,139,116,0.22)] bg-[#f0f7f2] px-4 py-3 text-sm text-[#476251]">
+                  {notice}
+                </p>
+              ) : null}
+
+              <button
+                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#233044] bg-[#233044] px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isBusy}
+                type="submit"
+              >
+                {loading === "email"
+                  ? "处理中..."
+                  : mode === "signup"
+                    ? "创建账号"
+                    : "邮箱登录"}
+              </button>
+            </form>
+
+            {mode === "signin" ? (
+              <div className="mt-3 text-right">
                 <button
-                  key={p.id}
+                  className="text-xs font-medium text-[#5f7993] transition hover:text-[#233044]"
+                  disabled={isBusy}
+                  onClick={handlePasswordReset}
                   type="button"
-                  onClick={() => handleSocialLogin(p.id)}
-                  disabled={loading !== null}
-                  className="group flex w-full items-center gap-3 rounded-full border border-[rgba(35,48,68,0.08)] bg-white/88 px-5 py-3 text-sm font-medium text-[var(--foreground)] transition hover:-translate-y-0.5 hover:bg-white hover:text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ animation: `pulse-step-in 420ms cubic-bezier(0.22,1,0.36,1) both ${i * 72}ms` }}
+                >
+                  {loading === "reset" ? "发送中..." : "忘记密码？"}
+                </button>
+              </div>
+            ) : null}
+
+            <div className="my-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-[rgba(35,48,68,0.08)]" />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-400">
+                或使用
+              </span>
+              <span className="h-px flex-1 bg-[rgba(35,48,68,0.08)]" />
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PROVIDERS.map((provider) => (
+                <button
+                  key={provider.id}
+                  type="button"
+                  onClick={() => handleSocialLogin(provider.id)}
+                  disabled={isBusy}
+                  className="group flex min-h-11 items-center justify-center gap-2 rounded-full border border-[rgba(35,48,68,0.08)] bg-white/88 px-4 text-sm font-medium text-[var(--foreground)] transition hover:-translate-y-0.5 hover:bg-white hover:text-[var(--accent-ink)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[var(--accent-warm)]">
-                    {p.icon}
+                    {provider.icon}
                   </span>
-                  <span>使用 {p.label} 登录</span>
-                  {loading === p.id && (
-                    <span className="ml-auto text-xs text-[var(--accent-warm)]">跳转中…</span>
-                  )}
+                  <span>{provider.label}</span>
                 </button>
               ))}
             </div>
 
             <p className="mt-4 text-center text-[11px] text-stone-400">
-              登录即表示同意服务条款
+              注册或登录即表示同意服务条款
             </p>
           </div>
         </div>
