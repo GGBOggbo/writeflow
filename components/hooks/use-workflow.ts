@@ -858,6 +858,7 @@ export function useWorkflow(
 
   return {
     state,
+    storageOwnerKey,
     creditBalance,
     canGenerate,
     loading,

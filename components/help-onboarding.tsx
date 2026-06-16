@@ -42,28 +42,44 @@ const onboardingSteps = [
   },
 ] as const;
 
-function markOnboardingDone() {
+export function getHelpOnboardingStorageKey(storageOwnerKey?: string | null) {
+  return storageOwnerKey
+    ? `${HELP_ONBOARDING_STORAGE_KEY}:${storageOwnerKey}`
+    : HELP_ONBOARDING_STORAGE_KEY;
+}
+
+function markOnboardingDone(storageOwnerKey?: string | null) {
   try {
-    window.localStorage.setItem(HELP_ONBOARDING_STORAGE_KEY, "done");
+    window.localStorage.setItem(
+      getHelpOnboardingStorageKey(storageOwnerKey),
+      "done"
+    );
   } catch {
     // Storage can be unavailable in private or locked-down browser contexts.
   }
 }
 
-function hasCompletedOnboarding() {
+function hasCompletedOnboarding(storageOwnerKey?: string | null) {
   try {
-    return window.localStorage.getItem(HELP_ONBOARDING_STORAGE_KEY) === "done";
+    return (
+      window.localStorage.getItem(getHelpOnboardingStorageKey(storageOwnerKey)) ===
+      "done"
+    );
   } catch {
     return false;
   }
 }
 
-export function HelpOnboarding() {
+export function HelpOnboarding({
+  storageOwnerKey = null,
+}: {
+  storageOwnerKey?: string | null;
+}) {
   const titleId = useId();
   const cardRef = useRef<HTMLElement | null>(null);
   const shouldShowOnboarding = useSyncExternalStore(
     () => () => {},
-    () => !hasCompletedOnboarding(),
+    () => !hasCompletedOnboarding(storageOwnerKey),
     () => false
   );
   const [isForcedOpen, setIsForcedOpen] = useState(false);
@@ -160,7 +176,7 @@ export function HelpOnboarding() {
   }, [currentStep.target, isDismissed, isForcedOpen, shouldShowOnboarding]);
 
   const dismiss = () => {
-    markOnboardingDone();
+    markOnboardingDone(storageOwnerKey);
     setIsForcedOpen(false);
     setIsDismissed(true);
   };

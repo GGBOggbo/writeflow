@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   HELP_ONBOARDING_OPEN_EVENT,
   HELP_ONBOARDING_STORAGE_KEY,
+  getHelpOnboardingStorageKey,
   HelpOnboarding,
 } from "./help-onboarding";
 
@@ -119,6 +120,28 @@ describe("HelpOnboarding", () => {
     );
   });
 
+  it("stores dismissal separately for each signed-in user", async () => {
+    const user = userEvent.setup();
+    const userAKey = getHelpOnboardingStorageKey("user-a");
+    const userBKey = getHelpOnboardingStorageKey("user-b");
+
+    const { rerender } = render(
+      <HelpOnboarding key="user-a" storageOwnerKey="user-a" />
+    );
+
+    await user.click(screen.getByRole("button", { name: "跳过" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(userAKey)).toBe("done");
+    expect(window.localStorage.getItem(userBKey)).toBeNull();
+
+    rerender(<HelpOnboarding key="user-b" storageOwnerKey="user-b" />);
+
+    expect(
+      await screen.findByRole("dialog", { name: /先看顶部流水线/i })
+    ).toBeInTheDocument();
+  });
+
   it("advances through steps", async () => {
     const user = userEvent.setup();
     render(<HelpOnboarding />);
@@ -147,16 +170,16 @@ describe("HelpOnboarding", () => {
   });
 
   it("stays hidden after dismissal", () => {
-    window.localStorage.setItem(HELP_ONBOARDING_STORAGE_KEY, "done");
+    window.localStorage.setItem(getHelpOnboardingStorageKey("user-a"), "done");
 
-    render(<HelpOnboarding />);
+    render(<HelpOnboarding storageOwnerKey="user-a" />);
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("can be reopened manually for returning users", async () => {
-    window.localStorage.setItem(HELP_ONBOARDING_STORAGE_KEY, "done");
-    render(<HelpOnboarding />);
+    window.localStorage.setItem(getHelpOnboardingStorageKey("user-a"), "done");
+    render(<HelpOnboarding storageOwnerKey="user-a" />);
 
     window.dispatchEvent(new Event(HELP_ONBOARDING_OPEN_EVENT));
 

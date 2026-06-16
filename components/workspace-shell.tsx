@@ -25,6 +25,7 @@ export function WorkspaceShell() {
   const [signingOut, setSigningOut] = useState(false);
   const {
     state,
+    storageOwnerKey,
     creditBalance,
     resetPending,
     handleRequestResetWorkflow,
@@ -211,7 +212,10 @@ export function WorkspaceShell() {
           <ManuscriptPanel />
         </div>
       </div>
-      <HelpOnboarding />
+      <HelpOnboarding
+        key={storageOwnerKey ?? "anonymous"}
+        storageOwnerKey={storageOwnerKey}
+      />
     </main>
   );
 }
