@@ -14,6 +14,8 @@ const navigationMocks = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 
+const fetchMock = vi.hoisted(() => vi.fn());
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: navigationMocks.push,
@@ -35,6 +37,13 @@ vi.mock("@/lib/auth-client", () => ({
 
 describe("LoginPage", () => {
   beforeEach(() => {
+    fetchMock.mockReset().mockResolvedValue(
+      new Response(JSON.stringify({ exists: false, emailVerified: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
     authClientMocks.requestPasswordReset.mockReset().mockResolvedValue({
       data: { status: true },
       error: null,
@@ -75,44 +84,159 @@ describe("LoginPage", () => {
 
   it("registers with email, name, and password", async () => {
     const user = userEvent.setup();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, sent: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
 
     render(<LoginPage />);
 
     await user.click(screen.getByRole("button", { name: "注册" }));
     await user.type(screen.getByLabelText("昵称"), "内容主理人");
-    await user.type(screen.getByLabelText("邮箱"), "reader@example.com");
+    await user.type(screen.getByLabelText("邮箱"), "reader@qq.com");
     await user.type(screen.getByLabelText("密码"), "password123");
-    await user.click(screen.getByRole("button", { name: "创建账号" }));
+    await user.click(screen.getByRole("button", { name: "发送验证码" }));
 
     await waitFor(() => {
-      expect(authClientMocks.signUpEmail).toHaveBeenCalledWith({
-        name: "内容主理人",
-        email: "reader@example.com",
-        password: "password123",
-        callbackURL: "/",
+      expect(fetchMock).toHaveBeenCalledWith("/api/auth/email-otp/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: "reader@qq.com", purpose: "signup" }),
       });
     });
     expect(
-      await screen.findByText(/验证邮件已经发送/i)
+      await screen.findByText(/验证码已经发送/i)
     ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("验证码"), "123456");
+    await user.click(screen.getByRole("button", { name: "完成注册" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/auth/email-otp/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "内容主理人",
+          email: "reader@qq.com",
+          password: "password123",
+          code: "123456",
+        }),
+      });
+    });
+    expect(await screen.findByText(/注册完成/i)).toBeInTheDocument();
+    expect(authClientMocks.signUpEmail).not.toHaveBeenCalled();
   });
 
-  it("requests a password reset email", async () => {
+  it("blocks registration when the email already exists", async () => {
     const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "这个邮箱已经注册，请直接登录。" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
 
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("邮箱"), "reader@example.com");
+    await user.click(screen.getByRole("button", { name: "注册" }));
+    await user.type(screen.getByLabelText("昵称"), "内容主理人");
+    await user.type(screen.getByLabelText("邮箱"), "reader@qq.com");
+    await user.type(screen.getByLabelText("密码"), "password123");
+    await user.click(screen.getByRole("button", { name: "发送验证码" }));
+
+    expect(
+      await screen.findByText(/这个邮箱已经注册/i)
+    ).toBeInTheDocument();
+    expect(authClientMocks.signUpEmail).not.toHaveBeenCalled();
+  });
+
+  it("resets a password with an email OTP", async () => {
+    const user = userEvent.setup();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, sent: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+    render(<LoginPage />);
+
     await user.click(screen.getByRole("button", { name: "忘记密码？" }));
+    await user.type(screen.getByLabelText("邮箱"), "reader@qq.com");
+    await user.click(screen.getByRole("button", { name: "发送验证码" }));
 
     await waitFor(() => {
-      expect(authClientMocks.requestPasswordReset).toHaveBeenCalledWith({
-        email: "reader@example.com",
-        redirectTo: "/reset-password",
+      expect(fetchMock).toHaveBeenCalledWith("/api/auth/email-otp/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: "reader@qq.com",
+          purpose: "password-reset",
+        }),
       });
     });
+    expect(await screen.findByText(/验证码已经发送/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("验证码"), "123456");
+    await user.type(screen.getByLabelText("新密码"), "newpassword123");
+    await user.click(screen.getByRole("button", { name: "重置密码" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/auth/email-otp/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: "reader@qq.com",
+          password: "newpassword123",
+          code: "123456",
+        }),
+      });
+    });
+    expect(await screen.findByText(/密码已重置/i)).toBeInTheDocument();
+    expect(authClientMocks.requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("shows a clear message when resetting an unregistered email", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "这个邮箱还没有注册。" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    render(<LoginPage />);
+
+    await user.click(screen.getByRole("button", { name: "忘记密码？" }));
+    await user.type(screen.getByLabelText("邮箱"), "missing@qq.com");
+    await user.click(screen.getByRole("button", { name: "发送验证码" }));
+
     expect(
-      await screen.findByText(/如果这个邮箱存在/i)
+      await screen.findByText(/这个邮箱还没有注册/i)
     ).toBeInTheDocument();
   });
 });

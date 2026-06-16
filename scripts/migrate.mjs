@@ -110,6 +110,23 @@ function migrateSqlite() {
       "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY ("userId", "operationId")
     );
+
+    CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      "codeHash" TEXT NOT NULL,
+      "ipHash" TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "expiresAt" TEXT NOT NULL,
+      "consumedAt" TEXT,
+      "lockedUntil" TEXT
+    );
+    CREATE INDEX IF NOT EXISTS auth_otp_email_purpose_created_idx
+      ON auth_otp_challenges (email, purpose, "createdAt");
+    CREATE INDEX IF NOT EXISTS auth_otp_ip_purpose_created_idx
+      ON auth_otp_challenges ("ipHash", purpose, "createdAt");
   `);
 
   seedSqliteAdmins(database);
@@ -229,6 +246,26 @@ async function migratePostgres() {
   `);
   console.log("  ✓ workflow_credit_operations");
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      "codeHash" TEXT NOT NULL,
+      "ipHash" TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "expiresAt" TIMESTAMPTZ NOT NULL,
+      "consumedAt" TIMESTAMPTZ,
+      "lockedUntil" TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS auth_otp_email_purpose_created_idx
+      ON auth_otp_challenges (email, purpose, "createdAt");
+    CREATE INDEX IF NOT EXISTS auth_otp_ip_purpose_created_idx
+      ON auth_otp_challenges ("ipHash", purpose, "createdAt");
+  `);
+  console.log("  ✓ auth_otp_challenges");
+
   await seedPostgresAdmins(pool);
   await pool.end();
   console.log("\nPostgreSQL migration complete!");
@@ -290,7 +327,6 @@ async function seedPostgresAdmins(pool) {
 
 function getAdmins() {
   return [
-    { email: "1710269083@qq.com", name: "chk" },
     { email: "hophuctam8946@gmail.com", name: "Tam" },
   ];
 }

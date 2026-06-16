@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 type AuthMode = "signin" | "signup";
-type LoadingAction = "email" | "reset" | "github" | "google" | null;
+type LoginView = AuthMode | "reset";
+type LoadingAction = "email" | "otp" | "github" | "google" | null;
 
 const PROVIDERS = [
   {
@@ -47,21 +48,44 @@ function getAuthErrorMessage(message?: string) {
   return message;
 }
 
+async function postJson(url: string, body: Record<string, unknown>) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+    throw new Error(data?.error || "操作失败，请稍后重试。");
+  }
+
+  return response.json();
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<AuthMode>("signin");
+  const [mode, setMode] = useState<LoginView>("signin");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState<LoadingAction>(null);
   const isBusy = loading !== null;
 
-  const switchMode = (nextMode: AuthMode) => {
+  const switchMode = (nextMode: LoginView) => {
     setMode(nextMode);
     setError("");
     setNotice("");
+    setCode("");
+    setOtpSent(false);
   };
 
   const handleEmailSubmit = async (event: React.FormEvent) => {
@@ -72,19 +96,52 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        const result = await authClient.signUp.email({
-          name,
-          email,
-          password,
-          callbackURL: "/",
-        });
-
-        if (result.error) {
-          setError(getAuthErrorMessage(result.error.message));
+        if (!otpSent) {
+          await postJson("/api/auth/email-otp/send", {
+            email,
+            purpose: "signup",
+          });
+          setOtpSent(true);
+          setNotice("验证码已经发送，请打开邮箱查看 6 位验证码。");
           return;
         }
 
-        setNotice("验证邮件已经发送，请打开邮箱完成验证后再登录。");
+        await postJson("/api/auth/email-otp/signup", {
+          name,
+          email,
+          password,
+          code,
+        });
+
+        setMode("signin");
+        setCode("");
+        setOtpSent(false);
+        setNotice("注册完成，请使用邮箱和密码登录。");
+        return;
+      }
+
+      if (mode === "reset") {
+        if (!otpSent) {
+          await postJson("/api/auth/email-otp/send", {
+            email,
+            purpose: "password-reset",
+          });
+          setOtpSent(true);
+          setNotice("验证码已经发送。如果这个邮箱存在，请打开邮箱查看 6 位验证码。");
+          return;
+        }
+
+        await postJson("/api/auth/email-otp/reset-password", {
+          email,
+          password,
+          code,
+        });
+
+        setMode("signin");
+        setCode("");
+        setOtpSent(false);
+        setPassword("");
+        setNotice("密码已重置，请使用新密码登录。");
         return;
       }
 
@@ -100,41 +157,22 @@ export default function LoginPage() {
       }
 
       router.push("/");
-    } catch {
-      setError("操作失败，请稍后重试。");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error ? caughtError.message : "操作失败，请稍后重试。"
+      );
     } finally {
       setLoading(null);
     }
   };
 
-  const handlePasswordReset = async () => {
+  const handlePasswordReset = () => {
     setError("");
     setNotice("");
-
-    if (!email) {
-      setError("请先填写邮箱。");
-      return;
-    }
-
-    setLoading("reset");
-
-    try {
-      const result = await authClient.requestPasswordReset({
-        email,
-        redirectTo: "/reset-password",
-      });
-
-      if (result.error) {
-        setError(getAuthErrorMessage(result.error.message));
-        return;
-      }
-
-      setNotice("如果这个邮箱存在，我们已经发送了重置密码邮件。");
-    } catch {
-      setError("重置邮件发送失败，请稍后重试。");
-    } finally {
-      setLoading(null);
-    }
+    setCode("");
+    setPassword("");
+    setOtpSent(false);
+    setMode("reset");
   };
 
   const handleSocialLogin = async (provider: "github" | "google") => {
@@ -173,7 +211,7 @@ export default function LoginPage() {
                 onClick={() => switchMode("signin")}
                 className={[
                   "min-h-10 rounded-full text-sm font-semibold transition",
-                  mode === "signin"
+                  mode === "signin" || mode === "reset"
                     ? "bg-[#233044] text-white shadow-sm"
                     : "text-stone-500 hover:bg-white hover:text-[#233044]",
                 ].join(" ")}
@@ -201,7 +239,7 @@ export default function LoginPage() {
                   <input
                     autoComplete="name"
                     className="mt-1.5 w-full rounded-[18px] border border-[rgba(35,48,68,0.1)] bg-white/90 px-4 py-3 text-sm text-[#233044] outline-none transition placeholder:text-stone-400 focus:border-[rgba(95,121,147,0.4)] focus:ring-4 focus:ring-[rgba(95,121,147,0.12)]"
-                    disabled={isBusy}
+                    disabled={isBusy || otpSent}
                     minLength={1}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="例如：内容主理人"
@@ -226,20 +264,41 @@ export default function LoginPage() {
                 />
               </label>
 
-              <label className="block text-sm font-medium text-[#233044]">
-                密码
-                <input
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  className="mt-1.5 w-full rounded-[18px] border border-[rgba(35,48,68,0.1)] bg-white/90 px-4 py-3 text-sm text-[#233044] outline-none transition placeholder:text-stone-400 focus:border-[rgba(95,121,147,0.4)] focus:ring-4 focus:ring-[rgba(95,121,147,0.12)]"
-                  disabled={isBusy}
-                  minLength={8}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="至少 8 位"
-                  required
-                  type="password"
-                  value={password}
-                />
-              </label>
+              {mode !== "reset" || otpSent ? (
+                <label className="block text-sm font-medium text-[#233044]">
+                  {mode === "reset" ? "新密码" : "密码"}
+                  <input
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    className="mt-1.5 w-full rounded-[18px] border border-[rgba(35,48,68,0.1)] bg-white/90 px-4 py-3 text-sm text-[#233044] outline-none transition placeholder:text-stone-400 focus:border-[rgba(95,121,147,0.4)] focus:ring-4 focus:ring-[rgba(95,121,147,0.12)]"
+                    disabled={isBusy || (mode === "signup" && otpSent)}
+                    minLength={8}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="至少 8 位"
+                    required
+                    type="password"
+                    value={password}
+                  />
+                </label>
+              ) : null}
+
+              {(mode === "signup" || mode === "reset") && otpSent ? (
+                <label className="block text-sm font-medium text-[#233044]">
+                  验证码
+                  <input
+                    autoComplete="one-time-code"
+                    className="mt-1.5 w-full rounded-[18px] border border-[rgba(35,48,68,0.1)] bg-white/90 px-4 py-3 text-sm text-[#233044] outline-none transition placeholder:text-stone-400 focus:border-[rgba(95,121,147,0.4)] focus:ring-4 focus:ring-[rgba(95,121,147,0.12)]"
+                    disabled={isBusy}
+                    inputMode="numeric"
+                    maxLength={6}
+                    minLength={6}
+                    onChange={(event) => setCode(event.target.value)}
+                    placeholder="6 位数字"
+                    required
+                    type="text"
+                    value={code}
+                  />
+                </label>
+              ) : null}
 
               {error ? (
                 <p className="rounded-[18px] border border-[rgba(184,108,95,0.22)] bg-[#fff4f1] px-4 py-3 text-sm text-[#9c2a25]">
@@ -261,8 +320,14 @@ export default function LoginPage() {
                 {loading === "email"
                   ? "处理中..."
                   : mode === "signup"
-                    ? "创建账号"
-                    : "邮箱登录"}
+                    ? otpSent
+                      ? "完成注册"
+                      : "发送验证码"
+                    : mode === "reset"
+                      ? otpSent
+                        ? "重置密码"
+                        : "发送验证码"
+                      : "邮箱登录"}
               </button>
             </form>
 
@@ -274,7 +339,7 @@ export default function LoginPage() {
                   onClick={handlePasswordReset}
                   type="button"
                 >
-                  {loading === "reset" ? "发送中..." : "忘记密码？"}
+                  忘记密码？
                 </button>
               </div>
             ) : null}
