@@ -339,7 +339,7 @@ describe("AppClient", () => {
 
   it("shows a visible brief-loading placeholder immediately after topic selection", async () => {
     const user = userEvent.setup();
-    let resolveBrief: ((value: Response) => void) | null = null;
+    let resolveBrief: (value: Response) => void = () => {};
 
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
@@ -379,7 +379,7 @@ describe("AppClient", () => {
 
     expect(await screen.findByText(/正在根据这个选题生成写作提纲/i)).toBeInTheDocument();
 
-    resolveBrief?.(
+    resolveBrief(
       new Response(
         JSON.stringify({
           brief: {
@@ -782,7 +782,7 @@ describe("AppClient", () => {
 
   it("ignores stale topic results after resetting during an in-flight request", async () => {
     const user = userEvent.setup();
-    let resolveTopics: ((value: Response) => void) | null = null;
+    let resolveTopics: (value: Response) => void = () => {};
 
     vi.spyOn(globalThis, "fetch").mockImplementationOnce(
       () =>
@@ -798,7 +798,7 @@ describe("AppClient", () => {
     await user.click(screen.getByRole("button", { name: /开启新稿/i }));
     await user.click(screen.getByRole("button", { name: /确认清空当前稿件/i }));
 
-    resolveTopics?.(
+    resolveTopics(
       new Response(
         JSON.stringify({
           topics: [

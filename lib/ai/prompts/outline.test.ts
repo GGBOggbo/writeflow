@@ -58,8 +58,10 @@ describe("buildOutlinePrompt", () => {
       briefConstraints: ["避免空话"],
       searchEnabled: true,
       searchContext: {
+        status: "success",
         query: "一人公司 文章结构 大纲",
         intent: "outline",
+        freshness: "pastMonth",
         results: [
           {
             title: "爆款文章结构拆解",

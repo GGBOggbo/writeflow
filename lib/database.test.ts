@@ -3,12 +3,15 @@ import { getDatabaseConfig, parseSqlitePath } from "./database";
 
 describe("database config", () => {
   it("defaults to postgres and requires DATABASE_URL", () => {
-    expect(() => getDatabaseConfig({})).toThrow("DATABASE_URL is required");
+    expect(() => getDatabaseConfig({ NODE_ENV: "test" })).toThrow(
+      "DATABASE_URL is required"
+    );
   });
 
   it("reads postgres connection strings", () => {
     expect(
       getDatabaseConfig({
+        NODE_ENV: "test",
         DATABASE_PROVIDER: "postgres",
         DATABASE_URL: "postgresql://example",
       })
@@ -20,11 +23,15 @@ describe("database config", () => {
 
   it("reads sqlite file URLs", () => {
     const config = getDatabaseConfig({
+      NODE_ENV: "test",
       DATABASE_PROVIDER: "sqlite",
       DATABASE_URL: "file:./data/dev.sqlite",
     });
 
     expect(config.provider).toBe("sqlite");
+    if (config.provider !== "sqlite") {
+      throw new Error("Expected sqlite config");
+    }
     expect(config.path).toContain("/data/dev.sqlite");
   });
 

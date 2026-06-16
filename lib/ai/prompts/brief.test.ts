@@ -42,8 +42,10 @@ describe("buildBriefPrompt", () => {
       structureType: "故事案例型",
       searchEnabled: true,
       searchContext: {
+        status: "success",
         query: "一人公司 公众号 痛点",
         intent: "brief",
+        freshness: "pastMonth",
         results: [
           {
             title: "一人公司不是你想象的那样",

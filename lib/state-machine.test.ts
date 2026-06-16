@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { createInitialWorkflowState, transitionWorkflow } from "./state-machine";
-import type { WorkflowState } from "@/types/workflow";
+import type { TopicOption, WorkflowState } from "@/types/workflow";
+
+function topic(overrides: Partial<TopicOption> = {}): TopicOption {
+  const id = overrides.id ?? "t1";
+  const title = overrides.title ?? "Topic";
+  const angle = overrides.angle ?? "Angle";
+  return {
+    id,
+    title,
+    label: overrides.label ?? title,
+    angle,
+    summary: overrides.summary ?? "Summary",
+    coreViewpoint: overrides.coreViewpoint ?? `${title} core viewpoint`,
+    targetAudience: overrides.targetAudience ?? "目标读者",
+    reason: overrides.reason ?? `${angle} is worth exploring`,
+  };
+}
 
 describe("workflow state machine", () => {
   it("defaults structure type and lets the brief stage update it", () => {
@@ -57,12 +73,12 @@ describe("workflow state machine", () => {
       type: "topics_generated",
       searchContext,
       topics: [
-        {
+        topic({
           id: "t1",
           title: "Topic 1",
           angle: "Angle 1",
           summary: "Summary 1",
-        },
+        }),
       ],
     });
 
@@ -77,7 +93,9 @@ describe("workflow state machine", () => {
       currentStep: "finalize",
       structureType: "故事案例型",
       ideaInput: "AI 写作工作流",
-      topicOptions: [{ id: "old-topic", title: "旧选题", angle: "旧角度", summary: "旧摘要" }],
+      topicOptions: [
+        topic({ id: "old-topic", title: "旧选题", angle: "旧角度", summary: "旧摘要" }),
+      ],
       selectedTopicId: "old-topic",
       brief: {
         objective: "旧目标",
@@ -120,24 +138,24 @@ describe("workflow state machine", () => {
     const next = transitionWorkflow(state, {
       type: "topics_generated",
       topics: [
-        {
+        topic({
           id: "new-topic",
           title: "新选题",
           angle: "新角度",
           summary: "新摘要",
-        },
+        }),
       ],
     });
 
     expect(next.currentStep).toBe("topic_select");
     expect(next.structureType).toBe("痛点拆解型");
     expect(next.topicOptions).toEqual([
-      {
+      topic({
         id: "new-topic",
         title: "新选题",
         angle: "新角度",
         summary: "新摘要",
-      },
+      }),
     ]);
     expect(next.selectedTopicId).toBeNull();
     expect(next.brief).toBeNull();
@@ -161,8 +179,8 @@ describe("workflow state machine", () => {
       structureType: "故事案例型",
       ideaInput: "AI 写作工作流",
       topicOptions: [
-        { id: "topic-a", title: "选题 A", angle: "角度 A", summary: "摘要 A" },
-        { id: "topic-b", title: "选题 B", angle: "角度 B", summary: "摘要 B" },
+        topic({ id: "topic-a", title: "选题 A", angle: "角度 A", summary: "摘要 A" }),
+        topic({ id: "topic-b", title: "选题 B", angle: "角度 B", summary: "摘要 B" }),
       ],
       selectedTopicId: "topic-a",
       brief: {
@@ -446,7 +464,7 @@ describe("brief_updated event", () => {
       ...createInitialWorkflowState(),
       currentStep: "brief_confirm",
       selectedTopicId: "t1",
-      topicOptions: [{ id: "t1", title: "Topic", angle: "Angle", summary: "Summary" }],
+      topicOptions: [topic({ id: "t1", title: "Topic", angle: "Angle", summary: "Summary" })],
       brief: {
         objective: "原目标",
         audience: "原读者",
@@ -480,7 +498,7 @@ describe("go_to_step prerequisite guards", () => {
     const state = {
       ...createInitialWorkflowState(),
       currentStep: "draft_review" as const,
-      topicOptions: [{ id: "t1", title: "T", angle: "A", summary: "S" }],
+      topicOptions: [topic({ id: "t1", title: "T", angle: "A", summary: "S" })],
       selectedTopicId: "t1",
       brief: {
         objective: "O",
@@ -510,7 +528,7 @@ describe("go_to_step prerequisite guards", () => {
     const state: WorkflowState = {
       ...createInitialWorkflowState(),
       currentStep: "brief_confirm",
-      topicOptions: [{ id: "t1", title: "T", angle: "A", summary: "S" }],
+      topicOptions: [topic({ id: "t1", title: "T", angle: "A", summary: "S" })],
       selectedTopicId: "t1",
       brief: {
         objective: "O",
@@ -530,7 +548,7 @@ describe("go_to_step prerequisite guards", () => {
     const state: WorkflowState = {
       ...createInitialWorkflowState(),
       currentStep: "outline_review",
-      topicOptions: [{ id: "t1", title: "T", angle: "A", summary: "S" }],
+      topicOptions: [topic({ id: "t1", title: "T", angle: "A", summary: "S" })],
       selectedTopicId: null,
       brief: null,
       outline: [{ id: "s1", heading: "H", corePoint: "C", supportSuggestion: "S", sectionRole: "R" }],
@@ -546,7 +564,7 @@ describe("go_to_step prerequisite guards", () => {
       ...createInitialWorkflowState(),
       currentStep: "meta_review",
       selectedTopicId: "t1",
-      topicOptions: [{ id: "t1", title: "T", angle: "A", summary: "S" }],
+      topicOptions: [topic({ id: "t1", title: "T", angle: "A", summary: "S" })],
       brief: { objective: "O", audience: "A", persona: "P", tone: "T", dropOffPoint: "D", constraints: ["C"] },
       outline: [],
       materialSlots: [],

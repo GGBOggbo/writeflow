@@ -9,6 +9,9 @@ describe("auth database adapter", () => {
         "postgresql://user:password@example.neon.tech/neondb?sslmode=require",
     });
 
+    if (!("type" in database)) {
+      throw new Error("Expected postgres auth database");
+    }
     expect(database.type).toBe("postgres");
     expect(database.db).toEqual(
       expect.objectContaining({

@@ -27,8 +27,10 @@ describe("buildTopicsPrompt", () => {
       searchEnabled: true,
       searchMode: "default",
       searchContext: {
+        status: "success",
         query: "AI 写作工作流 公众号 选题 痛点 最新",
         intent: "topics",
+        freshness: "pastMonth",
         crowdedness: "high",
         seoKeywords: ["AI写作", "工作流"],
         staleBuzzwords: ["底层逻辑"],
@@ -73,8 +75,10 @@ describe("buildTopicsPrompt", () => {
       searchEnabled: true,
       searchMode: "default",
       searchContext: {
+        status: "success",
         query: "AI 写作工作流 选题 痛点",
         intent: "topics",
+        freshness: "pastMonth",
         crowdedness: "low",
         seoKeywords: [],
         staleBuzzwords: [],

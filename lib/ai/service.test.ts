@@ -11,6 +11,7 @@ import {
 import * as searchService from "@/lib/search/service";
 import { mockAIProvider } from "./mock-provider";
 import { capturePinoOutput } from "@/lib/logging/test-utils";
+import type { SearchReferenceBundle } from "@/lib/search/types";
 
 function createDraftInput() {
   return {
@@ -500,7 +501,7 @@ body: 模块必须解决阅读任务。
     vi.stubEnv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1");
     vi.stubEnv("MIMO_MODEL", "mimo-v2.5-pro");
 
-    const searchContext = {
+    const searchContext: SearchReferenceBundle = {
       status: "success",
       query: "AI 写作 痛点",
       intent: "topics",
@@ -517,7 +518,7 @@ body: 模块必须解决阅读任务。
       crowdedness: "low",
       staleBuzzwords: [],
       notes: [],
-    } as const;
+    };
 
     vi.spyOn(searchService, "searchForTopics").mockResolvedValueOnce(searchContext);
 
@@ -1017,6 +1018,9 @@ body: 模块必须解决阅读任务。
                     {
                       id: "section-1",
                       heading: "为什么先跑通 MVP 主流程",
+                      corePoint: "先验证主流程。",
+                      supportSuggestion: "补充真实迭代片段。",
+                      sectionRole: "核心论证",
                       notes: "先界定用户路径和验证目标。",
                     },
                   ],
@@ -1026,6 +1030,7 @@ body: 模块必须解决阅读任务。
                       targetOutlineId: "section-1",
                       label: "案例证据",
                       content: "补一个真实开发迭代片段。",
+                      purpose: "支撑核心论证",
                     },
                   ],
                 }),
@@ -1107,7 +1112,9 @@ body: 模块必须解决阅读任务。
       structureType: "痛点拆解型",
       briefObjective: "帮助读者理解 AI 产品从原型到真实接入的工程决策。",
       briefAudience: "产品经理和 AI 应用开发者",
+      briefPersona: "一个踩过坑、讲真话的实战派产品负责人",
       briefTone: "清晰、务实、具体",
+      briefDropOffPoint: "让读者意识到先跑通主流程再接真实 AI 才是更稳的路线",
       briefConstraints: ["避免空话", "强调流程拆解"],
     });
 
@@ -1199,6 +1206,9 @@ body: 模块必须解决阅读任务。
                       {
                         id: "section-1",
                         heading: "为什么先跑通 MVP 主流程",
+                        corePoint: "先验证主流程。",
+                        supportSuggestion: "补充真实迭代片段。",
+                        sectionRole: "核心论证",
                         notes: "先界定用户路径和验证目标。",
                       },
                     ],
@@ -1208,6 +1218,7 @@ body: 模块必须解决阅读任务。
                         targetOutlineId: "section-1",
                         label: "案例证据",
                         content: "补一个真实开发迭代片段。",
+                        purpose: "支撑核心论证",
                       },
                     ],
                   }),
@@ -1255,9 +1266,12 @@ body: 模块必须解决阅读任务。
       coreViewpoint: "先跑通主流程，再接真实 AI，才是更稳的工程顺序。",
       targetAudience: "产品经理和 AI 应用开发者",
       reason: "这个切口兼顾工程真实感和可复用方法论，适合做深度复盘。",
+      structureType: "痛点拆解型",
       briefObjective: "帮助读者理解 AI 产品从原型到真实接入的工程决策。",
       briefAudience: "产品经理和 AI 应用开发者",
+      briefPersona: "一个踩过坑、讲真话的实战派产品负责人",
       briefTone: "清晰、务实、具体",
+      briefDropOffPoint: "让读者意识到先跑通主流程再接真实 AI 才是更稳的路线",
       briefConstraints: ["避免空话", "强调流程拆解"],
     });
 
@@ -1282,6 +1296,9 @@ body: 模块必须解决阅读任务。
                     {
                       id: "section-1",
                       heading: "为什么先跑通 MVP 主流程",
+                      corePoint: "先验证主流程。",
+                      supportSuggestion: "补充真实迭代片段。",
+                      sectionRole: "核心论证",
                       notes: "先界定用户路径和验证目标。",
                     },
                   ],
@@ -1291,6 +1308,7 @@ body: 模块必须解决阅读任务。
                       targetOutlineId: "section-1",
                       label: "案例证据",
                       content: "补一个真实开发迭代片段。",
+                      purpose: "支撑核心论证",
                     },
                   ],
                 }),
@@ -1342,6 +1360,9 @@ body: 模块必须解决阅读任务。
                   outline: {
                     id: "section-1",
                     heading: "为什么先跑通 MVP 主流程",
+                    corePoint: "先验证主流程。",
+                    supportSuggestion: "补充真实迭代片段。",
+                    sectionRole: "核心论证",
                     notes: "先界定用户路径和验证目标。",
                   },
                   materialSlots: {
@@ -1349,6 +1370,7 @@ body: 模块必须解决阅读任务。
                     targetOutlineId: "section-1",
                     label: "案例证据",
                     content: "补一个真实开发迭代片段。",
+                    purpose: "支撑核心论证",
                   },
                 }),
                 role: "assistant",
@@ -1439,6 +1461,9 @@ body: 模块必须解决阅读任务。
         {
           id: "section-1",
           heading: "为什么先跑通 MVP 主流程",
+          corePoint: "先验证主流程。",
+          supportSuggestion: "补充真实迭代片段。",
+          sectionRole: "核心论证",
           notes: "先界定用户路径和验证目标。",
         },
       ],
@@ -1448,6 +1473,7 @@ body: 模块必须解决阅读任务。
           targetOutlineId: "section-1",
           label: "案例证据",
           content: "补一个真实开发迭代片段。",
+          purpose: "支撑核心论证",
         },
       ],
     });
@@ -1740,6 +1766,9 @@ body: 模块必须解决阅读任务。
         {
           id: "section-1",
           heading: "为什么第7天就放弃",
+          corePoint: "新手卡在第一步。",
+          supportSuggestion: "补充真实放弃场景。",
+          sectionRole: "痛点引入",
           notes: "讲清楚第一步卡点。",
         },
       ],
@@ -1872,6 +1901,9 @@ body: 模块必须解决阅读任务。
         {
           id: "section-1",
           heading: "为什么先跑通 MVP 主流程",
+          corePoint: "先验证主流程。",
+          supportSuggestion: "补充真实迭代片段。",
+          sectionRole: "核心论证",
           notes: "先界定用户路径和验证目标。",
         },
       ],
@@ -1881,6 +1913,7 @@ body: 模块必须解决阅读任务。
           targetOutlineId: "section-1",
           label: "案例证据",
           content: "补一个真实开发迭代片段。",
+          purpose: "支撑核心论证",
         },
       ],
     });
@@ -1960,6 +1993,9 @@ body: 模块必须解决阅读任务。
         {
           id: "section-1",
           heading: "为什么先跑通 MVP 主流程",
+          corePoint: "先验证主流程。",
+          supportSuggestion: "补充真实迭代片段。",
+          sectionRole: "核心论证",
           notes: "先界定用户路径和验证目标。",
         },
       ],
@@ -1969,6 +2005,7 @@ body: 模块必须解决阅读任务。
           targetOutlineId: "section-1",
           label: "案例证据",
           content: "补一个真实开发迭代片段。",
+          purpose: "支撑核心论证",
         },
       ],
     });
@@ -2040,6 +2077,9 @@ body: 模块必须解决阅读任务。
         {
           id: "section-1",
           heading: "为什么先跑通 MVP 主流程",
+          corePoint: "先验证主流程。",
+          supportSuggestion: "补充真实迭代片段。",
+          sectionRole: "核心论证",
           notes: "先界定用户路径和验证目标。",
         },
       ],
@@ -2049,6 +2089,7 @@ body: 模块必须解决阅读任务。
           targetOutlineId: "section-1",
           label: "案例证据",
           content: "补一个真实开发迭代片段。",
+          purpose: "支撑核心论证",
         },
       ],
     });
@@ -2104,6 +2145,9 @@ body: 模块必须解决阅读任务。
         {
           id: "section-1",
           heading: "为什么先跑通 MVP 主流程",
+          corePoint: "先验证主流程。",
+          supportSuggestion: "补充真实迭代片段。",
+          sectionRole: "核心论证",
           notes: "先界定用户路径和验证目标。",
         },
       ],
@@ -2113,6 +2157,7 @@ body: 模块必须解决阅读任务。
           targetOutlineId: "section-1",
           label: "案例证据",
           content: "补一个真实开发迭代片段。",
+          purpose: "支撑核心论证",
         },
       ],
     });

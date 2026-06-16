@@ -89,8 +89,10 @@ describe("buildMetaPrompt", () => {
       searchEnabled: true,
       searchMode: "default",
       searchContext: {
+        status: "success",
         query: "从 MVP 到真实 AI 接入 产品经理 痛点 现状",
         intent: "meta",
+        freshness: "pastMonth",
         crowdedness: "high",
         seoKeywords: ["AI接入", "MVP"],
         staleBuzzwords: ["底层逻辑"],
