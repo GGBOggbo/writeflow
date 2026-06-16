@@ -1,15 +1,10 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
-import { getDatabaseConfig, getPostgresPool, getSqliteDatabase } from "./database";
+import { createAuthDatabase } from "./auth-database";
+import { getDatabaseConfig } from "./database";
 
 const databaseConfig = getDatabaseConfig();
-const database =
-  databaseConfig.provider === "sqlite"
-    ? getSqliteDatabase()
-    : {
-        db: getPostgresPool(),
-        type: "postgres" as const,
-      };
+const database = createAuthDatabase(databaseConfig);
 
 export const auth = betterAuth({
   database,
