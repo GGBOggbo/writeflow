@@ -28,7 +28,7 @@ export function IdeaStage() {
         </p>
       </div>
 
-      <label className="block">
+      <label className="block" data-onboarding-target="idea-input">
         <span className="mb-2 block text-sm font-medium text-stone-800">
           核心想法
         </span>

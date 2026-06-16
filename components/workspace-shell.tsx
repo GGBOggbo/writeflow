@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkflowContext } from "./workflow-context";
 import { ChatPanel } from "./chat-panel";
+import { HELP_ONBOARDING_OPEN_EVENT, HelpOnboarding } from "./help-onboarding";
 import { ManuscriptPanel } from "./manuscript-panel";
 import { WorkflowStatus } from "./workflow-status";
 import { getSelectedTopic } from "./hooks/use-workflow";
@@ -42,6 +43,9 @@ export function WorkspaceShell() {
       },
     });
     setSigningOut(false);
+  };
+  const handleOpenHelpOnboarding = () => {
+    window.dispatchEvent(new Event(HELP_ONBOARDING_OPEN_EVENT));
   };
   const selectedTopic = getSelectedTopic(state);
   const heroTitle =
@@ -100,6 +104,7 @@ export function WorkspaceShell() {
               </div>
               <div className="flex w-full flex-wrap items-stretch gap-3 sm:w-auto sm:justify-end">
                 <div
+                  data-onboarding-target="credits"
                   aria-label={
                     hasNoCredits
                       ? "积分不足"
@@ -162,6 +167,13 @@ export function WorkspaceShell() {
                     </button>
                     <button
                       type="button"
+                      onClick={handleOpenHelpOnboarding}
+                      className="inline-flex rounded-full border border-[rgba(95,121,147,0.18)] bg-white/70 px-3 py-2 text-sm font-medium text-[#5f7993] transition hover:-translate-y-0.5 hover:bg-white hover:text-[#233044]"
+                    >
+                      查看导览
+                    </button>
+                    <button
+                      type="button"
                       disabled={signingOut}
                       onClick={handleSignOut}
                       className="inline-flex rounded-full border border-[rgba(35,48,68,0.10)] bg-white/60 px-3 py-2 text-sm font-medium text-stone-500 transition hover:-translate-y-0.5 hover:bg-white hover:text-stone-700 disabled:opacity-50"
@@ -199,6 +211,7 @@ export function WorkspaceShell() {
           <ManuscriptPanel />
         </div>
       </div>
+      <HelpOnboarding />
     </main>
   );
 }

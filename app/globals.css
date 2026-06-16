@@ -208,6 +208,44 @@ a {
   color: white;
 }
 
+.help-onboarding-layer {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(35, 48, 68, 0.04), rgba(35, 48, 68, 0.1));
+}
+
+.help-onboarding-card {
+  left: var(--help-onboarding-card-left, 16px);
+  top: var(--help-onboarding-card-top, 16px);
+  width: min(calc(100vw - 32px), 440px);
+  transform-origin: center bottom;
+  will-change: transform, opacity;
+}
+
+.help-onboarding-card::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: -10px;
+  width: 18px;
+  height: 18px;
+  border-left: 1px solid rgba(35, 48, 68, 0.16);
+  border-top: 1px solid rgba(35, 48, 68, 0.16);
+  background: #ffffff;
+  transform: rotate(45deg);
+}
+
+.help-onboarding-target--active {
+  position: relative;
+  z-index: 55;
+  border-radius: 24px;
+  outline: 2px solid rgba(95, 121, 147, 0.58);
+  outline-offset: 6px;
+  box-shadow:
+    0 0 0 12px rgba(95, 121, 147, 0.12),
+    0 18px 44px rgba(35, 48, 68, 0.16);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   body {
     animation: page-rise 560ms ease-out both;
@@ -233,6 +271,28 @@ a {
   .generation-pulse__step--active .generation-pulse__dot {
     animation: pulse-dot 1.2s ease-in-out infinite;
   }
+
+  .help-onboarding-layer {
+    animation: help-onboarding-layer-in 220ms ease-out both;
+  }
+
+  .help-onboarding-card {
+    animation: help-onboarding-card-in 480ms cubic-bezier(0.22, 1, 0.36, 1)
+      both;
+  }
+
+  .help-onboarding-target--active {
+    animation: help-onboarding-target-pulse 1.8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-onboarding-layer,
+  .help-onboarding-card,
+  .help-onboarding-target--active {
+    animation: none;
+    transition-duration: 0ms;
+  }
 }
 
 @keyframes page-rise {
@@ -244,6 +304,43 @@ a {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes help-onboarding-layer-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes help-onboarding-target-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 10px rgba(95, 121, 147, 0.1),
+      0 18px 44px rgba(35, 48, 68, 0.14);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 14px rgba(95, 121, 147, 0.16),
+      0 20px 48px rgba(35, 48, 68, 0.18);
+  }
+}
+
+@keyframes help-onboarding-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
