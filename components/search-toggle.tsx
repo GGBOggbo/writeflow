@@ -16,7 +16,10 @@ export function SearchToggle({
   onChange,
 }: SearchToggleProps) {
   return (
-    <label className="editorial-soft flex items-start gap-4 rounded-[24px] border border-[rgba(35,48,68,0.08)] px-4 py-4 text-sm text-stone-700">
+    <label
+      className="editorial-soft flex items-start gap-4 rounded-[24px] border border-[rgba(35,48,68,0.08)] px-4 py-4 text-sm text-stone-700"
+      data-onboarding-target="search-toggle"
+    >
       <span className="relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center">
         <input
           type="checkbox"

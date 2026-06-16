@@ -31,7 +31,7 @@ export function WorkflowStatus() {
   const clickableUpperBound = Math.max(currentIndex, furthestReachedIndex);
 
   return (
-    <div className="grid gap-3 md:grid-cols-7">
+    <div className="grid gap-3 md:grid-cols-7" data-onboarding-target="workflow-pipeline">
       {stages.map((stage, index) => {
         const isActive = stage.step === state.currentStep;
         const isComplete =
