@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   HELP_ONBOARDING_OPEN_EVENT,
   HELP_ONBOARDING_STORAGE_KEY,
@@ -10,6 +10,10 @@ import {
 describe("HelpOnboarding", () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("appears on first visit", () => {
@@ -32,6 +36,73 @@ describe("HelpOnboarding", () => {
     await waitFor(() => {
       expect(screen.getByText("流水线区域")).toHaveClass(
         "help-onboarding-target--active"
+      );
+    });
+  });
+
+  it("positions the guide card in viewport coordinates after scrolling", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1000,
+    });
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 720,
+    });
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      value: 400,
+    });
+
+    const rect = ({
+      top,
+      left,
+      width,
+      height,
+    }: {
+      top: number;
+      left: number;
+      width: number;
+      height: number;
+    }) =>
+      ({
+        top,
+        left,
+        width,
+        height,
+        bottom: top + height,
+        right: left + width,
+        x: left,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function getBoundingClientRect(this: HTMLElement) {
+        if (this.classList.contains("help-onboarding-card")) {
+          return rect({ top: 0, left: 0, width: 440, height: 280 });
+        }
+
+        if (this.getAttribute("data-onboarding-target") === "workflow-pipeline") {
+          return rect({ top: 80, left: 40, width: 700, height: 120 });
+        }
+
+        return rect({ top: 0, left: 0, width: 0, height: 0 });
+      }
+    );
+
+    render(
+      <>
+        <div data-onboarding-target="workflow-pipeline">流水线区域</div>
+        <HelpOnboarding />
+      </>
+    );
+
+    const card = screen.getByRole("dialog", { name: /先看顶部流水线/i });
+
+    await waitFor(() => {
+      expect(card.style.getPropertyValue("--help-onboarding-card-top")).toBe(
+        "228px"
       );
     });
   });

@@ -133,7 +133,7 @@ export function HelpOnboarding() {
       card.style.setProperty("--help-onboarding-card-left", `${left}px`);
       card.style.setProperty(
         "--help-onboarding-card-top",
-        `${top + window.scrollY}px`
+        `${top}px`
       );
     };
 
