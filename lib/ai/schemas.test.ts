@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   briefRequestSchema,
   briefResponseSchema,
-  humanizeDraftRequestSchema,
+  completeDraftMaterialsRequestSchema,
+  completeDraftMaterialsResponseSchema,
+  formatDraftRequestSchema,
+  formatDraftResponseSchema,
   metaResponseSchema,
   outlineRequestSchema,
   outlineResponseSchema,
@@ -20,6 +23,25 @@ describe("AI schemas", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a standalone draft formatting request and response", () => {
+    expect(
+      formatDraftRequestSchema.parse({
+        operationId,
+        draft: { id: "draft-1", label: "原始版", content: "纯正文。" },
+      })
+    ).toMatchObject({ draft: { id: "draft-1" } });
+
+    expect(
+      formatDraftResponseSchema.parse({
+        draft: {
+          id: "draft-1-formatted",
+          label: "排版版",
+          content: "## 小标题\n\n正文。",
+        },
+      })
+    ).toMatchObject({ draft: { label: "排版版" } });
   });
 
   it("requires structureType in a valid outline generation request", () => {
@@ -67,15 +89,41 @@ describe("AI schemas", () => {
     ).toBe(false);
   });
 
-  it("accepts a separately metered draft humanization request", () => {
+
+  it("accepts a free material completion request and response", () => {
+    const request = completeDraftMaterialsRequestSchema.safeParse({
+      operationId,
+      draft: {
+        id: "draft-1",
+        label: "原始版",
+        content: "正文。【💡需要你补充：补充公开背景】",
+      },
+      topicLabel: "AI 产品工程顺序",
+      topicAngle: "先跑主流程",
+      coreViewpoint: "先验证用户路径。",
+      briefObjective: "解释工程取舍。",
+      briefAudience: "AI 产品经理",
+      briefPersona: "务实的产品负责人",
+      outline: [
+        {
+          id: "section-1",
+          heading: "为什么先跑主流程",
+          corePoint: "先验证路径。",
+          supportSuggestion: "补充工程背景。",
+          sectionRole: "核心拆解",
+        },
+      ],
+      searchContext: null,
+    });
+
+    expect(request.success).toBe(true);
     expect(
-      humanizeDraftRequestSchema.safeParse({
-        operationId,
-        draft: { id: "draft-1", label: "原始版", content: "原始正文" },
-        coreViewpoint: "先验证再优化。",
-        briefPersona: "实战派负责人",
-        briefTone: "务实",
-        briefDropOffPoint: "让读者先行动。",
+      completeDraftMaterialsResponseSchema.safeParse({
+        draft: {
+          id: "draft-1-materials-123",
+          label: "AI 补充版",
+          content: "已补充正文。",
+        },
       }).success
     ).toBe(true);
   });

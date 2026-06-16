@@ -65,4 +65,48 @@ body: 模块正文
     expect(html).toContain("跨模块脚注内容");
     expect(html.indexOf("中间结论")).toBeLessThan(html.indexOf("跨模块脚注内容"));
   });
+
+  it("renders material placeholders as blocking warning cards instead of polished notice cards", () => {
+    const html = renderExtendedMarkdown(`正文开头。
+
+【💡需要你补充：第一次发现问题的真实场景】
+
+正文继续。`);
+
+    expect(html).toContain('data-material-placeholder="required"');
+    expect(html).toContain("必须补充真实素材");
+    expect(html).toContain("需要你补充");
+    expect(html).toContain("第一次发现问题的真实场景");
+    expect(html).toContain("background:#fff1f2");
+    expect(html).not.toContain('data-mpa-action-id="notice"');
+    expect(html).not.toContain("【💡");
+  });
+
+  it("degrades oversized duplicate CTA modules to ordinary text without losing content", () => {
+    const argument =
+      "这一步卡住的随机性在哪？卡在结构上。AI 直接写代码最大的问题是边写边改，写到后面发现前面的设计不对，又回头改。";
+    const html = renderExtendedMarkdown(`正文开头。
+
+:::cta
+title: ${argument}
+note: ${argument}
+:::
+
+正文继续。`);
+
+    expect(html).not.toContain('data-mpa-action-id="cta"');
+    expect(html.match(/这一步卡住的随机性在哪/g)).toHaveLength(1);
+    expect(html).not.toContain(":::");
+    expect(html).toContain("正文继续");
+  });
+
+  it("still renders concise valid CTA modules", () => {
+    const html = renderExtendedMarkdown(`:::cta
+title: 先把主流程完整跑一遍
+note: BUILD WITH STRUCTURE
+:::`);
+
+    expect(html).toContain('data-mpa-action-id="cta"');
+    expect(html).toContain("先把主流程完整跑一遍");
+  });
 });

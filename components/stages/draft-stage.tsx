@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useWorkflowContext } from "../workflow-context";
-import { ProseText } from "../prose-text";
+import { useScrollSync } from "../hooks/use-scroll-sync";
 import { WechatFormatPanel } from "../wechat-format-panel";
 
 export function DraftStage() {
@@ -11,24 +12,40 @@ export function DraftStage() {
     canGenerate,
     requestStatus,
     handleSelectDraft,
-    handleHumanizeDraft,
+    handleUpdateDraft,
     handleFormatDraft,
-    handleSelectFormatTheme,
+    handleCompleteDraftMaterials,
     handleGenerateMeta,
   } = useWorkflowContext();
+  const [scrollSyncEnabled, setScrollSyncEnabled] = useState(true);
+  const {
+    sourceRef,
+    targetRef,
+    handleSourceScroll,
+    handleTargetScroll,
+    resetSyncLock,
+  } = useScrollSync(scrollSyncEnabled);
 
   const activeDraft =
     state.draftVersions.find((draft) => draft.id === state.selectedDraftVersionId) ??
     state.draftVersions[0];
-  const hasHumanizedDraft = state.draftVersions.some(
-    (draft) => draft.label === "去 AI 版"
+  const isFormatting =
+    loading && requestStatus?.action === "format_draft";
+  const isCompletingMaterials =
+    loading && requestStatus?.action === "complete_draft_materials";
+  const hasMaterialPlaceholder = activeDraft
+    ? /【💡需要你补充：[^】]+】/.test(activeDraft.content)
+    : false;
+  const hasCompletedMaterials = state.draftVersions.some(
+    (draft) => draft.label === "AI 补充版"
   );
-  const isHumanizing =
-    loading && requestStatus?.action === "humanize_draft";
-  const isFormatting = loading && requestStatus?.action === "format_draft";
-  const activeFormatting = activeDraft
-    ? state.draftFormattingByVersion[activeDraft.id]
-    : undefined;
+  useEffect(() => {
+    resetSyncLock();
+  }, [activeDraft?.id, resetSyncLock]);
+
+  const selectDraft = (draftId: string) => {
+    handleSelectDraft(draftId);
+  };
 
   return (
     <section className="space-y-6">
@@ -60,7 +77,7 @@ export function DraftStage() {
                     ? "bg-[#233044] text-stone-50"
                     : "border border-[rgba(35,48,68,0.16)] bg-white text-[#233044] hover:bg-[#f3f7fb]",
                 ].join(" ")}
-                onClick={() => handleSelectDraft(draft.id)}
+                onClick={() => selectDraft(draft.id)}
                 disabled={loading}
               >
                 {draft.label}
@@ -70,44 +87,99 @@ export function DraftStage() {
         </div>
       </fieldset>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-[28px] border border-[var(--line-soft)] bg-[#fcfdff] p-6 shadow-sm">
-          <p className="text-sm font-semibold text-stone-900">正文内容</p>
-          <ProseText
-            content={activeDraft?.content ?? ""}
-            className="mt-4 rounded-[24px] border border-[var(--line-soft)] bg-white/92 p-5 text-sm leading-7 text-stone-700"
-          />
+      <div
+        data-testid="draft-workspace"
+        className="grid gap-4 xl:h-[1160px] xl:grid-cols-2"
+      >
+        <div
+          data-testid="draft-body-panel"
+          className="flex flex-col rounded-[28px] border border-[var(--line-soft)] bg-[#fcfdff] p-6 shadow-sm xl:min-h-0 xl:overflow-hidden"
+        >
+          <div className="flex shrink-0 items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-stone-900">
+                Markdown 正文
+              </p>
+              <p className="mt-1 text-xs text-stone-500">
+                修改后会自动保存，并同步更新右侧预览。
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-stone-400">
+                AI 会保留原文主线，编辑阅读节奏并按内容选择模块；当前正文保留，不扣积分。
+              </p>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-full border border-[rgba(35,48,68,0.16)] bg-white px-3 py-2 text-xs font-semibold text-[#233044] transition hover:bg-[#f3f7fb] disabled:cursor-default disabled:bg-stone-100 disabled:text-stone-400"
+              onClick={() => void handleFormatDraft()}
+              disabled={loading || !activeDraft || hasMaterialPlaceholder}
+              title={
+                hasMaterialPlaceholder
+                  ? "正文还有需要补充的素材占位符，请先用 AI 补充素材后再排版。"
+                  : undefined
+              }
+            >
+              {isFormatting
+                ? "正在 AI 编辑排版..."
+                : hasMaterialPlaceholder
+                  ? "先补充素材再排版"
+                  : "AI 编辑排版（免费）"}
+            </button>
+          </div>
+          <label
+            data-testid="draft-editor-layout"
+            className="mt-4 block xl:flex xl:min-h-0 xl:flex-1"
+          >
+            <span className="sr-only">Markdown 正文</span>
+            <textarea
+              ref={(node) => {
+                sourceRef.current = node;
+              }}
+              data-testid="draft-scroll-area"
+              aria-label="Markdown 正文"
+              className="min-h-[520px] w-full resize-y rounded-[20px] border border-stone-300 bg-[#fbfbfa] p-5 font-mono text-sm leading-7 text-stone-800 outline-none focus:border-[#6688a4] focus:ring-2 focus:ring-[#6688a4]/15 xl:h-full xl:min-h-0 xl:flex-1 xl:resize-none"
+              value={activeDraft?.content ?? ""}
+              onScroll={handleSourceScroll}
+              onChange={(event) => {
+                if (activeDraft) {
+                  handleUpdateDraft(activeDraft.id, event.target.value);
+                }
+              }}
+            />
+          </label>
         </div>
 
         {activeDraft ? (
           <WechatFormatPanel
             key={activeDraft.id}
             draftLabel={activeDraft.label}
-            formatting={activeFormatting}
-            loading={isFormatting}
-            disabled={loading}
-            canGenerate={canGenerate}
-            onGenerate={() => void handleFormatDraft()}
-            onThemeChange={handleSelectFormatTheme}
+            content={activeDraft.content}
+            previewScrollRef={(node) => {
+              targetRef.current = node;
+            }}
+            onPreviewScroll={handleTargetScroll}
+            scrollSyncEnabled={scrollSyncEnabled}
+            onToggleScrollSync={() =>
+              setScrollSyncEnabled((enabled) => !enabled)
+            }
           />
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          className="rounded-full border border-[rgba(35,48,68,0.16)] bg-white px-5 py-3 text-sm font-semibold text-[#233044] transition hover:-translate-y-0.5 hover:bg-[#f3f7fb] disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
-          onClick={() => void handleHumanizeDraft()}
-          disabled={loading || !canGenerate || hasHumanizedDraft}
-        >
-          {isHumanizing
-            ? "正在去 AI 味..."
-            : hasHumanizedDraft
-            ? "已生成去 AI 版"
-            : canGenerate
-              ? "去 AI 味，消耗 1 积分"
-              : "积分不足"}
-        </button>
+      <div data-testid="draft-workflow-actions" className="flex flex-wrap gap-3">
+        {hasMaterialPlaceholder ? (
+          <button
+            type="button"
+            className="rounded-full border border-[#c96442]/35 bg-[#fff8f3] px-5 py-3 text-sm font-semibold text-[#a84f35] transition hover:-translate-y-0.5 hover:bg-[#f8e9df] disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400"
+            onClick={() => void handleCompleteDraftMaterials()}
+            disabled={loading || hasCompletedMaterials}
+          >
+            {isCompletingMaterials
+              ? "正在补充素材..."
+              : hasCompletedMaterials
+                ? "已补充素材"
+                : "AI 补充素材（免费）"}
+          </button>
+        ) : null}
         <button
           type="button"
           className="rounded-full bg-[#233044] px-5 py-3 text-sm font-semibold text-stone-50 transition hover:-translate-y-0.5 hover:bg-[#1a2432] disabled:cursor-not-allowed disabled:bg-stone-300"

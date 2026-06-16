@@ -239,7 +239,7 @@ export function selectEngagementCandidates(results: SearchResult[], limit = 5) {
     .map((item) => item.result);
 }
 
-export function selectDeepDiveArticles(results: SearchResult[], limit = 2) {
+export function selectDeepDiveArticles(results: SearchResult[], limit = 4) {
   if (limit <= 0) return [];
 
   const annotated = results.map((result, index) => ({
@@ -266,5 +266,24 @@ export function selectDeepDiveArticles(results: SearchResult[], limit = 2) {
       return diff === 0 ? left.index - right.index : diff;
     })[0];
 
-  return [stable.result, ...(anomaly ? [anomaly.result] : [])].slice(0, limit);
+  const selected = [stable.result, ...(anomaly ? [anomaly.result] : [])];
+  if (selected.length >= limit) {
+    return selected.slice(0, limit);
+  }
+
+  const selectedUrls = new Set(selected.map((result) => result.url));
+  const remaining = annotated
+    .filter((item) => !selectedUrls.has(item.result.url))
+    .sort((left, right) => {
+      const leftScore =
+        (left.result.qualitySignals?.stableScore ?? 0) +
+        (left.result.qualitySignals?.anomalyScore ?? 0);
+      const rightScore =
+        (right.result.qualitySignals?.stableScore ?? 0) +
+        (right.result.qualitySignals?.anomalyScore ?? 0);
+      return rightScore === leftScore ? left.index - right.index : rightScore - leftScore;
+    })
+    .map((item) => item.result);
+
+  return [...selected, ...remaining].slice(0, limit);
 }

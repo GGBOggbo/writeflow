@@ -29,7 +29,7 @@ import type { WxrankHistoricalArticle as RankedHistoricalArticle } from "./wxran
 
 const QUALIFIED_HISTORY_THRESHOLD = 5;
 const RESULT_LIMIT = 8;
-const DEEP_DIVE_LIMIT = 2;
+const DEFAULT_DEEP_DIVE_LIMIT = 8;
 
 function logKeyword(value: string) {
   return value.replace(/[\n\r\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
@@ -470,7 +470,11 @@ async function enrichDeepDiveArticles(
   results: SearchResult[],
   onProgress?: ProgressReporter
 ) {
-  const candidates = selectDeepDiveArticles(results, DEEP_DIVE_LIMIT);
+  const deepDiveLimit = getPositiveEnvInt(
+    "WXRANK_DEEP_DIVE_LIMIT",
+    DEFAULT_DEEP_DIVE_LIMIT
+  );
+  const candidates = selectDeepDiveArticles(results, deepDiveLimit);
   if (candidates.length === 0) {
     return results;
   }

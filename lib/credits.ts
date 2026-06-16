@@ -1,19 +1,24 @@
 import { Pool, type PoolClient } from "@neondatabase/serverless";
 import type { CreditBalance } from "@/types/credits";
+import {
+  AI_STAGES,
+  CREDIT_COST_PER_GENERATION,
+  CreditConflictError,
+  INITIAL_CREDITS,
+  InsufficientCreditsError,
+  type AiStage,
+} from "./credits-core";
+import { getDatabaseConfig, getPostgresPool, getSqliteDatabase } from "./database";
+import { SqliteCreditStore } from "./credits-sqlite";
 
-export const INITIAL_CREDITS = 5;
-export const CREDIT_COST_PER_GENERATION = 1;
-
-export const AI_STAGES = [
-  "topics",
-  "brief",
-  "outline",
-  "draft",
-  "humanize",
-  "meta",
-] as const;
-
-export type AiStage = (typeof AI_STAGES)[number];
+export {
+  AI_STAGES,
+  CREDIT_COST_PER_GENERATION,
+  CreditConflictError,
+  INITIAL_CREDITS,
+  InsufficientCreditsError,
+  type AiStage,
+};
 
 type CreditOperationRow = {
   stage: AiStage;
@@ -21,20 +26,10 @@ type CreditOperationRow = {
 };
 
 type Queryable = Pool | PoolClient;
-
-export class InsufficientCreditsError extends Error {
-  constructor() {
-    super("积分不足，无法继续生成。");
-    this.name = "InsufficientCreditsError";
-  }
-}
-
-export class CreditConflictError extends Error {
-  constructor(message = "该生成请求已处理，请勿重复提交。") {
-    super(message);
-    this.name = "CreditConflictError";
-  }
-}
+type CreditStoreLike = Pick<
+  CreditStore,
+  "getBalance" | "reserve" | "consume" | "refund"
+>;
 
 export class CreditStore {
   private initialized = false;
@@ -289,6 +284,23 @@ export class CreditStore {
   }
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+let store: CreditStoreLike | undefined;
 
-export const creditStore = new CreditStore(pool);
+function getCreditStore(): CreditStoreLike {
+  if (!store) {
+    const databaseConfig = getDatabaseConfig();
+    store =
+      databaseConfig.provider === "sqlite"
+        ? new SqliteCreditStore(getSqliteDatabase())
+        : new CreditStore(getPostgresPool());
+  }
+
+  return store;
+}
+
+export const creditStore: CreditStoreLike = {
+  getBalance: (...args) => getCreditStore().getBalance(...args),
+  reserve: (...args) => getCreditStore().reserve(...args),
+  consume: (...args) => getCreditStore().consume(...args),
+  refund: (...args) => getCreditStore().refund(...args),
+};

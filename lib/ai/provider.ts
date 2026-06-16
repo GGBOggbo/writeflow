@@ -1,10 +1,10 @@
 import type {
+  CompleteDraftMaterialsInput,
+  CompleteDraftMaterialsProviderOutput,
   GenerateBriefInput,
   GenerateBriefOutput,
   GenerateDraftInput,
   GenerateDraftOutput,
-  HumanizeDraftsInput,
-  HumanizeDraftsOutput,
   GenerateOutlineInput,
   GenerateOutlineOutput,
   GenerateTitlesAndSummariesInput,
@@ -23,6 +23,10 @@ export type BenchmarkSummaryOutput = ReturnType<
 export type AIProviderName = "mock" | "openai" | "anthropic" | "mimo" | "deepseek";
 export type RealAIProviderName = Exclude<AIProviderName, "mock">;
 
+export type DraftModuleLayoutOptions = {
+  qualityFeedback?: string;
+};
+
 export interface AIProvider {
   planTopicSearch(idea: string): Promise<TopicSearchPlan>;
   summarizeBenchmarks(results: SearchResult[]): Promise<BenchmarkSummaryOutput>;
@@ -30,7 +34,13 @@ export interface AIProvider {
   generateBrief(input: GenerateBriefInput): Promise<GenerateBriefOutput>;
   generateOutline(input: GenerateOutlineInput): Promise<GenerateOutlineOutput>;
   generateDraft(input: GenerateDraftInput): Promise<GenerateDraftOutput>;
-  humanizeDrafts(input: HumanizeDraftsInput): Promise<HumanizeDraftsOutput>;
+  formatDraftMarkdown(
+    content: string,
+    options?: DraftModuleLayoutOptions
+  ): Promise<string>;
+  completeDraftMaterials(
+    input: CompleteDraftMaterialsInput
+  ): Promise<CompleteDraftMaterialsProviderOutput>;
   generateTitlesAndSummaries(
     input: GenerateTitlesAndSummariesInput
   ): Promise<GenerateTitlesAndSummariesOutput>;

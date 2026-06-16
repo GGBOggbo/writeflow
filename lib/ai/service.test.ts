@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  completeDraftMaterials,
+  formatDraft,
   generateBrief,
   generateDraft,
-  humanizeDraft,
   generateOutline,
   generateTitlesAndSummaries,
   generateTopics,
@@ -10,6 +11,34 @@ import {
 import * as searchService from "@/lib/search/service";
 import { mockAIProvider } from "./mock-provider";
 import { capturePinoOutput } from "@/lib/logging/test-utils";
+
+function createDraftInput() {
+  return {
+    topicId: "topic-1",
+    topicLabel: "工程推进",
+    topicAngle: "先验证主流程",
+    coreViewpoint: "先跑通主流程，再优化模型。",
+    targetAudience: "产品经理",
+    reason: "这个顺序更稳。",
+    structureType: "痛点拆解型",
+    briefObjective: "讲清工程顺序。",
+    briefAudience: "产品经理",
+    briefPersona: "实战派负责人",
+    briefTone: "清晰、务实",
+    briefDropOffPoint: "让读者先验证主流程。",
+    briefConstraints: ["避免空话"],
+    outline: [
+      {
+        id: "section-1",
+        heading: "为什么先跑通主流程",
+        corePoint: "先验证用户路径。",
+        supportSuggestion: "补充真实场景。",
+        sectionRole: "痛点引入",
+      },
+    ],
+    materialSlots: [],
+  };
+}
 
 describe("AI service", () => {
   afterEach(() => {
@@ -24,6 +53,188 @@ describe("AI service", () => {
 
     expect(result.topics.length).toBeGreaterThan(0);
     expect(result.topics[0]).toHaveProperty("title");
+  });
+
+  it("keeps generated draft content unchanged until the user requests formatting", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const plain = "真正的问题不是模型，而是主流程还没跑通。\n\n先验证用户路径，再考虑模型配置。";
+    vi.spyOn(mockAIProvider, "generateDraft").mockResolvedValueOnce({
+      drafts: [{ id: "draft-a", label: "主稿", content: plain }],
+    });
+    const markdownSpy = vi.spyOn(mockAIProvider, "formatDraftMarkdown");
+    const events: string[] = [];
+
+    const result = await generateDraft(createDraftInput(), {
+      onProgress: (event) => events.push(event.stepId),
+    });
+
+    expect(markdownSpy).not.toHaveBeenCalled();
+    expect(result.drafts[0]).toMatchObject({
+      label: "原始版",
+      content: plain,
+    });
+    expect(events).not.toContain("markdown_formatting_started");
+  });
+
+  it("logs eight prompt references when draft reuses topic search context", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.stubEnv("LOG_LEVEL", "info");
+    const capture = capturePinoOutput();
+    vi.spyOn(mockAIProvider, "generateDraft").mockResolvedValueOnce({
+      drafts: [{ id: "draft-a", label: "主稿", content: "正文。" }],
+    });
+
+    await generateDraft({
+      ...createDraftInput(),
+      searchEnabled: true,
+      searchContext: {
+        status: "success",
+        query: "AI 写作",
+        intent: "topics",
+        freshness: "pastMonth",
+        results: Array.from({ length: 8 }, (_, index) => ({
+          title: `第${index + 1}篇参考`,
+          snippet: `第${index + 1}篇摘要。`,
+          url: `https://example.com/${index + 1}`,
+          source: "wechat" as const,
+          benchmarkSummary: {
+            userPain: `第${index + 1}篇卡点`,
+            structurePattern: "场景 -> 判断 -> 方法",
+            rhythmNotes: "短段密集",
+            commentInsights: [],
+            reusableAngles: [],
+            avoidCopying: [],
+          },
+        })),
+        seoKeywords: [],
+        crowdedness: "low",
+        staleBuzzwords: [],
+        notes: [],
+      },
+    });
+
+    const logs = capture.output();
+    capture.restore();
+    expect(logs).toContain('"scope":"draft"');
+    expect(logs).toContain('"promptReferences":8');
+  });
+
+  it("logs the final advanced module count and names after Markdown formatting", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.stubEnv("LOG_LEVEL", "info");
+    const plain = "真正的问题不是模型，而是主流程还没跑通。\n\n先验证用户路径，再考虑模型配置。";
+    vi.spyOn(mockAIProvider, "formatDraftMarkdown").mockResolvedValue(
+      [
+        "## 真正的问题",
+        "",
+        ":::verdict",
+        "title: 真正的问题不是模型",
+        "body: 真正的问题不是模型，而是主流程还没跑通。",
+        ":::",
+        "",
+        "先验证用户路径，再考虑模型配置。",
+      ].join("\n")
+    );
+    const capture = capturePinoOutput();
+
+    const result = await formatDraft({
+      draft: { id: "draft-a", label: "原始版", content: plain },
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const completed = capture
+      .records()
+      .find((record) => record.event === "draft.markdown.completed");
+    capture.restore();
+    expect(completed).toMatchObject({
+      moduleCount: 1,
+      moduleNames: ["verdict"],
+      ctaCount: 0,
+    });
+    expect(result.draft).toMatchObject({
+      label: "排版版",
+      content: expect.stringContaining(":::verdict"),
+    });
+  });
+
+  it("returns the first Markdown formatting result without quality retry", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const plain = [
+      "真正的问题不是模型，而是主流程还没跑通。",
+      "很多人一上来就追求最强配置，最后连用户为什么离开都不知道。",
+      "先验证用户路径，再考虑模型配置。",
+    ].join("\n\n");
+    const formatter = vi
+      .spyOn(mockAIProvider, "formatDraftMarkdown")
+      .mockResolvedValueOnce(plain)
+      .mockResolvedValueOnce("## 不应调用第二次");
+
+    const result = await formatDraft({
+      draft: { id: "draft-a", label: "原始版", content: plain },
+    });
+
+    expect(formatter).toHaveBeenCalledTimes(1);
+    expect(result.draft.content).toBe(plain);
+  });
+
+  it.each([
+    ["empty output", ""],
+    ["dangerous html", "<script>alert(1)</script>"],
+    ["content loss", "## 太短\n\n只剩一句。"],
+  ])("passes through Markdown formatting output on %s", async (_label, formatted) => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const plain = "真正的问题不是模型，而是主流程还没跑通。\n\n先验证用户路径，再考虑模型配置。";
+    const formatter = vi.spyOn(mockAIProvider, "formatDraftMarkdown");
+    formatter.mockResolvedValueOnce(formatted);
+    const events: string[] = [];
+
+    const result = await formatDraft({
+      draft: { id: "draft-a", label: "原始版", content: plain },
+    }, {
+      onProgress: (event) => events.push(event.stepId),
+    });
+
+    expect(result.draft.content).toBe(formatted);
+    expect(events).toContain("markdown_formatting_completed");
+    expect(events).not.toContain("markdown_formatting_degraded");
+  });
+
+  it("bubbles provider failures instead of using local Markdown fallback", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.spyOn(mockAIProvider, "formatDraftMarkdown").mockRejectedValueOnce(
+      new Error("formatter unavailable")
+    );
+
+    await expect(
+      formatDraft({
+        draft: { id: "draft-a", label: "原始版", content: "正文。" },
+      })
+    ).rejects.toThrow("formatter unavailable");
+  });
+
+  it("passes through a valid original module even when AI formatting changes it", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const original = `:::verdict
+eyebrow: 最终判断
+title: 结构比颜色重要
+body: 模块必须解决阅读任务。
+:::`;
+    vi.spyOn(mockAIProvider, "formatDraftMarkdown").mockResolvedValue(
+      original.replace(":::verdict", ":::summary")
+    );
+    const events: string[] = [];
+
+    const result = await formatDraft({
+      draft: { id: "draft-a", label: "原始版", content: original },
+    }, {
+      onProgress: (event) => events.push(event.stepId),
+    });
+
+    expect(result.draft.content).toBe(
+      original.replace(":::verdict", ":::summary")
+    );
+    expect(events).toContain("markdown_formatting_completed");
+    expect(events).not.toContain("markdown_formatting_degraded");
   });
 
   it("uses the configured mock provider", async () => {
@@ -1247,166 +1458,183 @@ describe("AI service", () => {
     );
   });
 
-  it("returns the original draft without automatically running the humanizer", async () => {
-    vi.stubEnv("AI_PROVIDER", "mimo");
-    vi.stubEnv("MIMO_API_KEY", "test-key");
-    vi.stubEnv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1");
-    vi.stubEnv("MIMO_MODEL", "mimo-v2.5-pro");
 
-    const placeholder = "【💡需要你补充：补一个真实开发片段】";
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    drafts: [
-                      {
-                        id: "draft-a",
-                        label: "原始版",
-                        content: `首先，这不仅是流程问题，更是认知升级。${placeholder}`,
-                      },
-                    ],
-                  }),
-                },
-              },
-            ],
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        )
-      );
 
-    const result = await generateDraft({
-      topicId: "topic-1",
-      topicLabel: "工程推进视角",
-      topicAngle: "从 MVP 到真实 AI 接入的工程推进",
-      coreViewpoint: "先跑通主流程，再接真实 AI。",
-      targetAudience: "产品经理",
-      reason: "这个切口可复用。",
-      structureType: "痛点拆解型",
-      briefObjective: "讲清工程顺序。",
-      briefAudience: "产品经理",
-      briefPersona: "踩过坑的产品负责人",
-      briefTone: "清晰、务实",
-      briefDropOffPoint: "让读者先验证主流程。",
-      briefConstraints: ["避免空话"],
-      outline: [
+  it("creates a separate AI material completion draft", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.spyOn(mockAIProvider, "completeDraftMaterials").mockResolvedValueOnce({
+      drafts: [
         {
-          id: "section-1",
-          heading: "为什么先跑通主流程",
-          notes: "讲清工程顺序。",
+          id: "draft-a",
+          label: "原始版",
+          content:
+            "开头。公开资料显示，团队通常会先用低成本方案验证完整链路，再决定是否升级模型。结尾。",
         },
       ],
-      materialSlots: [],
     });
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(result.drafts).toHaveLength(1);
-    expect(result.drafts[0]?.label).toBe("原始版");
-    expect(result.drafts[0]?.content).toBe(
-      `首先，这不仅是流程问题，更是认知升级。${placeholder}`
-    );
-  });
-
-  it("humanizes a delivered draft in a separate service call", async () => {
-    vi.stubEnv("AI_PROVIDER", "mimo");
-    vi.stubEnv("MIMO_API_KEY", "test-key");
-
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  drafts: [{ id: "draft-a", label: "原始版", content: "这事没那么玄。" }],
-                }),
-              },
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      )
-    );
-
-    const result = await humanizeDraft({
+    const result = await completeDraftMaterials({
       draft: {
         id: "draft-a",
         label: "原始版",
-        content: "首先，这不仅是流程问题，更是认知升级。",
+        content: "开头。【💡需要你补充：补充公开工程背景】结尾。",
       },
-      coreViewpoint: "先验证再优化。",
-      briefPersona: "实战派负责人",
-      briefTone: "务实",
-      briefDropOffPoint: "先行动。",
+      topicLabel: "AI 产品工程顺序",
+      topicAngle: "先验证主流程",
+      coreViewpoint: "先验证再升级模型。",
+      briefObjective: "解释工程取舍。",
+      briefAudience: "AI 产品经理",
+      briefPersona: "务实的产品负责人",
+      outline: createDraftInput().outline,
+      searchContext: null,
     });
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(String(fetchSpy.mock.calls[0]?.[1]?.body)).toContain("终审编辑");
-    expect(result.draft).toEqual({
-      id: "draft-a-humanized",
-      label: "去 AI 版",
-      content: "这事没那么玄。",
+    expect(result.draft.id).toMatch(/^draft-a-materials-/);
+    expect(result.draft.label).toBe("AI 补充版");
+    expect(result.draft.content).toContain("低成本方案验证完整链路");
+  });
+
+  it("normalizes the completed material draft with local Markdown structure", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const sourceContent = [
+      "模型越新，排队越久",
+      "上周二下午三点，我卡在一个 bug 上，想着用新模型救个急。【💡需要你补充：补充公开工程背景】",
+      "国产AI套餐的算力潜规则",
+      "你以为买了套餐就稳了？太天真了。不同档位的算力分配，水很深。",
+      "模型实测：能抢到的才算数",
+      "聊模型实测，别跟我扯跑分。我就问你：工作日白天，能不能稳定调用？",
+      "套餐选择：别为用不上的性能买单",
+      "别追最高配置，算你每天真正能用到的稳定时长。",
+    ].join("\n\n");
+    vi.spyOn(mockAIProvider, "completeDraftMaterials").mockResolvedValueOnce({
+      drafts: [
+        {
+          id: "draft-a",
+          label: "原始版",
+          content: sourceContent.replace(
+            "【💡需要你补充：补充公开工程背景】",
+            "公开资料和用户反馈都显示，高峰期等待会直接影响实际使用率。"
+          ),
+        },
+      ],
     });
-  });
 
-  it("throws when the separate humanizer request fails", async () => {
-    vi.stubEnv("AI_PROVIDER", "mimo");
-    vi.stubEnv("MIMO_API_KEY", "test-key");
-
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(
-      new Error("humanizer unavailable")
-    );
-
-    await expect(humanizeDraft({
-      draft: { id: "draft-a", label: "原始版", content: "原始正文。" },
-      coreViewpoint: "先验证再优化。",
-      briefPersona: "实战派负责人",
-      briefTone: "务实",
-      briefDropOffPoint: "先行动。",
-    })).rejects.toThrow("humanizer unavailable");
-  });
-
-  it("rejects a humanized draft that changes a material placeholder", async () => {
-    vi.stubEnv("AI_PROVIDER", "mimo");
-    vi.stubEnv("MIMO_API_KEY", "test-key");
-
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    drafts: [
-                      {
-                        id: "draft-a",
-                        label: "原始版",
-                        content: "正文。【💡需要你补充：一个案例】",
-                      },
-                    ],
-                  }),
-                },
-              },
-            ],
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        )
-      );
-
-    await expect(humanizeDraft({
+    const result = await completeDraftMaterials({
       draft: {
         id: "draft-a",
         label: "原始版",
-        content: "正文。【💡需要你补充：真实客户案例】",
+        content: sourceContent,
       },
-      coreViewpoint: "先验证再优化。",
-      briefPersona: "实战派负责人",
-      briefTone: "务实",
-      briefDropOffPoint: "先行动。",
-    })).rejects.toThrow(/素材占位符/);
+      topicLabel: "AI 套餐选择",
+      topicAngle: "算力焦虑",
+      coreViewpoint: "能稳定调用才算真正可用。",
+      briefObjective: "解释套餐选择。",
+      briefAudience: "AI 工具用户",
+      briefPersona: "务实的技术编辑",
+      outline: createDraftInput().outline,
+      searchContext: null,
+    });
+
+    expect(result.draft.content).toContain("## 模型越新，排队越久");
+    expect(result.draft.content).toContain("## 国产AI套餐的算力潜规则");
+    expect(result.draft.content).toContain("## 模型实测：能抢到的才算数");
+    expect(result.draft.content).toContain("## 套餐选择：别为用不上的性能买单");
   });
+
+  it("replaces unsupported personal material with a non-personal safe passage", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const privatePlaceholder = "【💡需要你补充：补充我的亲身客户案例】";
+    vi.spyOn(mockAIProvider, "completeDraftMaterials").mockResolvedValueOnce({
+      drafts: [
+        {
+          id: "draft-a",
+          label: "原始版",
+          content: "开头。这里补入了一段有公开资料支持的工程背景。中间。设想一个常见场景：团队在没有验证用户路径之前就提高模型成本，结果仍然无法判断问题出在模型还是流程。结尾。",
+        },
+      ],
+    });
+
+    const result = await completeDraftMaterials({
+      draft: {
+        id: "draft-a",
+        label: "原始版",
+        content: `开头。【💡需要你补充：补充公开工程背景】中间。${privatePlaceholder}结尾。`,
+      },
+      topicLabel: "AI 产品工程顺序",
+      topicAngle: "先验证主流程",
+      coreViewpoint: "先验证再升级模型。",
+      briefObjective: "解释工程取舍。",
+      briefAudience: "AI 产品经理",
+      briefPersona: "务实的产品负责人",
+      outline: createDraftInput().outline,
+      searchContext: null,
+    });
+
+    expect(result.draft.content).not.toContain(privatePlaceholder);
+    expect(result.draft.content).not.toContain("【💡需要你补充：");
+    expect(result.draft.content).toContain("设想一个常见场景");
+  });
+
+  it("rejects a completed draft that still contains any material placeholder", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const placeholder = "【💡需要你补充：补充我的亲身客户案例】";
+    vi.spyOn(mockAIProvider, "completeDraftMaterials").mockResolvedValueOnce({
+      drafts: [
+        {
+          id: "draft-a",
+          label: "原始版",
+          content: `开头。${placeholder}结尾。`,
+        },
+      ],
+    });
+
+    await expect(
+      completeDraftMaterials({
+        draft: {
+          id: "draft-a",
+          label: "原始版",
+          content: `开头。${placeholder}结尾。`,
+        },
+        topicLabel: "AI 产品工程顺序",
+        topicAngle: "先验证主流程",
+        coreViewpoint: "先验证再升级模型。",
+        briefObjective: "解释工程取舍。",
+        briefAudience: "AI 产品经理",
+        briefPersona: "务实的产品负责人",
+        outline: createDraftInput().outline,
+        searchContext: null,
+      })
+    ).rejects.toThrow("仍然包含需要补充的素材占位符");
+  });
+
+  it("rejects deleting a material placeholder without substantive replacement", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    vi.spyOn(mockAIProvider, "completeDraftMaterials").mockResolvedValueOnce({
+      drafts: [
+        { id: "draft-a", label: "原始版", content: "开头。结尾。" },
+      ],
+    });
+
+    await expect(
+      completeDraftMaterials({
+        draft: {
+          id: "draft-a",
+          label: "原始版",
+          content: "开头。【💡需要你补充：补充公开工程背景】结尾。",
+        },
+        topicLabel: "AI 产品工程顺序",
+        topicAngle: "先验证主流程",
+        coreViewpoint: "先验证再升级模型。",
+        briefObjective: "解释工程取舍。",
+        briefAudience: "AI 产品经理",
+        briefPersona: "务实的产品负责人",
+        outline: createDraftInput().outline,
+        searchContext: null,
+      })
+    ).rejects.toThrow("没有提供有效内容");
+  });
+
+
 
   it("summarizes deep-dive search benchmarks before requesting a draft from mimo", async () => {
     vi.stubEnv("AI_PROVIDER", "mimo");
@@ -1423,17 +1651,21 @@ describe("AI service", () => {
               {
                 message: {
                   content: JSON.stringify({
-                    summaries: [
-                      {
-                        url: "https://mp.weixin.qq.com/s/deep",
-                        userPain: "读者真正卡住的是不知道第一步该做什么。",
-                        structurePattern: "先讲失败场景，再拆误区，最后给最小行动。",
-                        rhythmNotes: "短段密集，判断句靠前。",
-                        commentInsights: ["评论区都在问怎么开始"],
-                        reusableAngles: ["从第7天放弃切入"],
-                        avoidCopying: ["不要照搬作者经历"],
-                      },
-                    ],
+                    summaries: Array.from({ length: 8 }, (_, index) => ({
+                      url:
+                        index === 0
+                          ? "https://mp.weixin.qq.com/s/deep"
+                          : `https://mp.weixin.qq.com/s/deep-${index + 1}`,
+                      userPain:
+                        index === 0
+                          ? "读者真正卡住的是不知道第一步该做什么。"
+                          : `第${index + 1}篇卡点也要进入正文参考。`,
+                      structurePattern: "先讲失败场景，再拆误区，最后给最小行动。",
+                      rhythmNotes: "短段密集，判断句靠前。",
+                      commentInsights: ["评论区都在问怎么开始"],
+                      reusableAngles: [`第${index + 1}篇可复用角度`],
+                      avoidCopying: ["不要照搬作者经历"],
+                    })),
                   }),
                   role: "assistant",
                 },
@@ -1478,15 +1710,7 @@ describe("AI service", () => {
             choices: [
               {
                 message: {
-                  content: JSON.stringify({
-                    drafts: [
-                      {
-                        id: "draft-a",
-                        label: "版本 A",
-                        content: "正文吸收了第一步卡点。",
-                      },
-                    ],
-                  }),
+                  content: "## **正文吸收了第一步卡点。**",
                 },
               },
             ],
@@ -1531,24 +1755,42 @@ describe("AI service", () => {
         staleBuzzwords: [],
         notes: [],
         results: [
-          {
-            title: "普通人用 AI 做副业，为什么第7天就放弃",
-            snippet: "真实复盘。",
-            url: "https://mp.weixin.qq.com/s/deep",
-            source: "wechat",
-            articleHtml: "<p>很多人不是不会用工具。</p><p><strong>真正卡住的是第一步。</strong></p>",
-            comments: [
-              { content: "我也不知道第一步怎么开始", likeCount: 90 },
-            ],
-          },
+          ...Array.from({ length: 8 }, (_, index) => ({
+            title:
+              index === 7
+                ? "第八篇深拆正文必须进入压缩"
+                : index === 0
+                  ? "普通人用 AI 做副业，为什么第7天就放弃"
+                  : `第${index + 1}篇深拆正文`,
+            snippet: index === 0 ? "真实复盘。" : `第${index + 1}篇。`,
+            url:
+              index === 0
+                ? "https://mp.weixin.qq.com/s/deep"
+                : `https://mp.weixin.qq.com/s/deep-${index + 1}`,
+            source: "wechat" as const,
+            articleHtml:
+              index === 0
+                ? "<p>很多人不是不会用工具。</p><p><strong>真正卡住的是第一步。</strong></p>"
+                : `<p>第${index + 1}篇完整正文。</p>`,
+            comments:
+              index === 0
+                ? [{ content: "我也不知道第一步怎么开始", likeCount: 90 }]
+                : undefined,
+          })),
         ],
       },
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(String(fetchSpy.mock.calls[0]?.[1]?.body)).toContain("对标拆解总结");
+    expect(String(fetchSpy.mock.calls[0]?.[1]?.body)).toContain(
+      "第八篇深拆正文必须进入压缩"
+    );
     expect(String(fetchSpy.mock.calls[1]?.[1]?.body)).toContain(
       "读者真正卡住的是不知道第一步该做什么。"
+    );
+    expect(String(fetchSpy.mock.calls[1]?.[1]?.body)).toContain(
+      "第8篇卡点也要进入正文参考。"
     );
     expect(result.searchContext?.results[0]?.benchmarkSummary?.userPain).toBe(
       "读者真正卡住的是不知道第一步该做什么。"
@@ -1688,15 +1930,7 @@ describe("AI service", () => {
             choices: [
               {
                 message: {
-                  content: JSON.stringify({
-                    drafts: [
-                      {
-                        id: "draft-a",
-                        label: "版本 A",
-                        content: "先讲清主流程。",
-                      },
-                    ],
-                  }),
+                  content: "## **先讲清主流程。**",
                 },
               },
             ],
@@ -1776,8 +2010,7 @@ describe("AI service", () => {
             choices: [
               {
                 message: {
-                  content:
-                    '{"drafts":[{"id":"draft_1","label":"深度技术评测风格","content":"这是被截断后残留的单个正文对象。"}]}',
+                  content: "## **这是被截断后残留的单个正文对象。**",
                 },
               },
             ],

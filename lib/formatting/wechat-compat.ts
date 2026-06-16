@@ -81,6 +81,7 @@ const STACKED_MODULES = [
   "image-text",
   "image-compare",
   "image-steps",
+  "cta",
 ] as const;
 
 function removeLayoutStyles(element: HTMLElement) {

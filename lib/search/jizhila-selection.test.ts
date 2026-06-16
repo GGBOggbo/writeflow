@@ -107,4 +107,31 @@ describe("Jizhila article selection", () => {
       "普通人用 AI 做副业，为什么第7天就放弃",
     ]);
   });
+
+  it("keeps the stable and anomaly picks then fills a four-article deep-dive pool", () => {
+    const selected = selectDeepDiveArticles(
+      [
+        article("稳定样本", {
+          engagementMetrics: { readCount: 12000, likeCount: 700, commentCount: 60 },
+        }),
+        article("异常高互动样本", {
+          engagementMetrics: { readCount: 2000, likeCount: 300, commentCount: 80 },
+        }),
+        article("补充样本 A", {
+          engagementMetrics: { readCount: 9000, likeCount: 400, commentCount: 30 },
+        }),
+        article("补充样本 B", {
+          engagementMetrics: { readCount: 7000, likeCount: 260, commentCount: 20 },
+        }),
+        article("低质量样本", {
+          engagementMetrics: { readCount: 100001, likeCount: 10, commentCount: 0 },
+        }),
+      ],
+      4
+    );
+
+    expect(selected).toHaveLength(4);
+    expect(new Set(selected.map((item) => item.url)).size).toBe(4);
+    expect(selected.map((item) => item.title)).not.toContain("低质量样本");
+  });
 });

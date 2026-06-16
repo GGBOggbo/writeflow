@@ -1,7 +1,7 @@
 import {
   briefResponseSchema,
+  completedDraftMaterialsResponseSchema,
   draftResponseSchema,
-  humanizedDraftResponseSchema,
   metaResponseSchema,
   outlineResponseSchema,
   topicResponseSchema,
@@ -11,7 +11,8 @@ import { topicSearchPlanSchema } from "@/lib/search/topic-search-plan";
 import { log } from "@/lib/debug";
 import { buildBriefPrompt } from "./prompts/brief";
 import { buildDraftPrompt } from "./prompts/draft";
-import { buildHumanizeDraftPrompt } from "./prompts/humanize-draft";
+import { buildMarkdownDraftPrompt } from "./prompts/markdown-draft";
+import { buildCompleteDraftMaterialsPrompt } from "./prompts/complete-materials";
 import { buildMetaPrompt } from "./prompts/meta";
 import { buildOutlinePrompt } from "./prompts/outline";
 import { buildTopicsPrompt } from "./prompts/topics";
@@ -56,9 +57,13 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
         assertProviderKey(config);
         throw notImplemented(config.name, "draft");
       },
-      async humanizeDrafts() {
+      async formatDraftMarkdown() {
         assertProviderKey(config);
-        throw notImplemented(config.name, "draft humanization");
+        throw notImplemented(config.name, "draft Markdown formatting");
+      },
+      async completeDraftMaterials() {
+        assertProviderKey(config);
+        throw notImplemented(config.name, "draft material completion");
       },
       async generateTitlesAndSummaries() {
         assertProviderKey(config);
@@ -101,7 +106,7 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
         buildPrompt: buildBenchmarkSummaryPrompt,
         jsonHint:
           '{"summaries":[{"url":"string","userPain":"string","structurePattern":"string","rhythmNotes":"string","commentInsights":["string"],"reusableAngles":["string"],"avoidCopying":["string"]}]}',
-        maxTokens: 1600,
+        maxTokens: 4096,
         temperature: 0.25,
         schema: benchmarkSummaryResponseSchema,
         label: `${providerLabel} benchmark summary`,
@@ -155,15 +160,25 @@ export function createRealAIProvider(name: RealAIProviderName): AIProvider {
         postParse: normalizeDraftPayload,
       }),
 
-    humanizeDrafts: (input) =>
+    formatDraftMarkdown: (content, options) =>
+      callMimoText({ content, options }, config, defaults, {
+        buildPrompt: (input) =>
+          buildMarkdownDraftPrompt(input.content, input.options),
+        maxTokens: 4096,
+        temperature: 0.25,
+        label: `${providerLabel} draft Markdown formatting`,
+        retries: 2,
+      }),
+
+    completeDraftMaterials: (input) =>
       callMimo(input, config, defaults, {
-        buildPrompt: buildHumanizeDraftPrompt,
+        buildPrompt: buildCompleteDraftMaterialsPrompt,
         jsonHint:
           '{"drafts":[{"id":"string","label":"string","content":"string"}]}',
-        maxTokens: 2400,
-        temperature: 0.65,
-        schema: humanizedDraftResponseSchema,
-        label: `${providerLabel} draft humanizer`,
+        maxTokens: 2600,
+        temperature: 0.2,
+        schema: completedDraftMaterialsResponseSchema,
+        label: `${providerLabel} draft material completion`,
         retries: 1,
         postParse: normalizeDraftPayload,
       }),
@@ -198,6 +213,113 @@ type MimoCallSpec<TInput, TOutput> = {
   /** Optional transform before schema validation (e.g. normalise draft shape). */
   postParse?: (parsed: unknown) => unknown;
 };
+
+type MimoTextCallSpec<TInput> = {
+  buildPrompt: (input: TInput) => { systemPrompt: string; userPrompt: string };
+  maxTokens: number;
+  temperature?: number;
+  model?: string;
+  label: string;
+  retries?: number;
+};
+
+async function callMimoText<TInput>(
+  input: TInput,
+  config: ReturnType<typeof getRealProviderConfig>,
+  defaults: { model: string; baseUrl: string; label: string },
+  spec: MimoTextCallSpec<TInput>
+): Promise<string> {
+  const prompt = spec.buildPrompt(input);
+  const model = spec.model || defaults.model;
+  const baseUrl = config.baseUrl?.trim() || defaults.baseUrl;
+  const maxAttempts = spec.retries ?? 1;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const t0 = Date.now();
+    let finishReason: string | undefined;
+    let completionTokens: number | undefined;
+    log.info("ai", "request started", {
+      event: "ai.request.started",
+      status: "started",
+      provider: config.name,
+      label: spec.label,
+      attempt: attempt + 1,
+      maxAttempts,
+      model,
+      maxTokens: spec.maxTokens,
+      systemPromptChars: prompt.systemPrompt.length,
+      userPromptChars: prompt.userPrompt.length,
+    });
+
+    try {
+      const response = await postMimoChatCompletion(baseUrl, config.apiKey, {
+        model,
+        messages: [
+          { role: "system", content: prompt.systemPrompt },
+          { role: "user", content: prompt.userPrompt },
+        ],
+        stream: false,
+        temperature: spec.temperature ?? 0.7,
+        top_p: 0.95,
+        max_completion_tokens: spec.maxTokens,
+        thinking: { type: "disabled" },
+      });
+      const json = (await response.json()) as MimoChatCompletionResponse;
+      finishReason = json.choices?.[0]?.finish_reason ?? undefined;
+      completionTokens = json.usage?.completion_tokens;
+
+      if (!response.ok) {
+        throw new Error(
+          json?.error?.message || `${spec.label} 请求失败（${response.status}）`
+        );
+      }
+      if (finishReason === "length") {
+        throw new Error(`${spec.label} 输出因长度限制被截断。`);
+      }
+
+      const content = stripOuterMarkdownFence(
+        json.choices?.[0]?.message?.content ?? ""
+      );
+      if (!content) {
+        throw new Error(`${spec.label} 返回为空。`);
+      }
+
+      log.info("ai", "request succeeded", {
+        event: "ai.request.succeeded",
+        status: "succeeded",
+        provider: config.name,
+        label: spec.label,
+        attempt: attempt + 1,
+        model,
+        durationMs: Date.now() - t0,
+        responseChars: content.length,
+        finishReason,
+        completionTokens,
+      });
+      return content;
+    } catch (error) {
+      lastError = error;
+      log.warn("ai", "request failed; retrying", {
+        event: "ai.request.failed",
+        status: "failed",
+        provider: config.name,
+        label: spec.label,
+        attempt: attempt + 1,
+        maxAttempts,
+        model,
+        durationMs: Date.now() - t0,
+        errorType: error instanceof Error ? error.name : typeof error,
+        finishReason,
+        completionTokens,
+      });
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`${spec.label} 请求失败。`);
+}
 
 async function callMimo<TInput, TOutput>(
   input: TInput,
@@ -334,10 +456,14 @@ async function callMimo<TInput, TOutput>(
 
 type MimoChatCompletionResponse = {
   choices?: Array<{
+    finish_reason?: string | null;
     message?: {
       content?: string | null;
     };
   }>;
+  usage?: {
+    completion_tokens?: number;
+  };
   error?: {
     message?: string;
   };
@@ -410,6 +536,12 @@ function normalizeDraftPayload(parsed: unknown): unknown {
   }
 
   return parsed;
+}
+
+function stripOuterMarkdownFence(content: string) {
+  const trimmed = content.trim();
+  const match = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i);
+  return (match?.[1] ?? trimmed).trim();
 }
 
 function normalizeOutlinePayload(parsed: unknown): unknown {

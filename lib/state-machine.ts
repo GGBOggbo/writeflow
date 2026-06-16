@@ -148,7 +148,18 @@ export function transitionWorkflow(
         selectedDraftVersionId: event.drafts[0]?.id ?? null,
         topicSearchContext: event.searchContext ?? state.topicSearchContext,
       };
-    case "draft_humanized":
+    case "draft_formatted":
+      return {
+        ...state,
+        draftVersions: [
+          ...state.draftVersions.filter(
+            (draft) => draft.label !== "排版版" && draft.id !== event.draft.id
+          ),
+          event.draft,
+        ],
+        selectedDraftVersionId: event.draft.id,
+      };
+    case "draft_materials_completed":
       return {
         ...state,
         draftVersions: [
@@ -156,6 +167,15 @@ export function transitionWorkflow(
           event.draft,
         ],
         selectedDraftVersionId: event.draft.id,
+      };
+    case "draft_updated":
+      return {
+        ...state,
+        draftVersions: state.draftVersions.map((draft) =>
+          draft.id === event.draftVersionId
+            ? { ...draft, content: event.content }
+            : draft
+        ),
       };
     case "meta_generated":
       return {

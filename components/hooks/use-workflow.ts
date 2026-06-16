@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  completeDraftMaterials as requestDraftMaterialCompletion,
+  formatDraft as requestDraftFormatting,
   generateBrief,
   generateDraft,
-  humanizeDraft,
   generateOutline,
   generateTitlesAndSummaries,
   generateTopics,
@@ -35,7 +36,8 @@ type WorkflowAction =
   | "select_topic"
   | "confirm_brief"
   | "generate_drafts"
-  | "humanize_draft"
+  | "format_draft"
+  | "complete_draft_materials"
   | "generate_meta";
 
 type RequestStatus = {
@@ -479,39 +481,41 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
     });
   };
 
-  const handleHumanizeDraft = async (retryOperationId?: string) => {
-    if (!state.brief) {
+  const handleUpdateDraft = (draftVersionId: string, content: string) => {
+    setError(null);
+    updateState(
+      transitionWorkflow(state, {
+        type: "draft_updated",
+        draftVersionId,
+        content,
+      })
+    );
+    return true;
+  };
+
+  const handleFormatDraft = async (retryOperationId?: string) => {
+    const selectedDraft = state.draftVersions.find(
+      (draft) => draft.id === state.selectedDraftVersionId
+    );
+
+    if (!selectedDraft) {
+      setError("未找到当前正文，请重新选择正文版本。");
       return;
     }
 
-    const selectedTopic = getSelectedTopic(state);
-    const originalDraft =
-      state.draftVersions.find((draft) => draft.label === "原始版") ??
-      state.draftVersions[0];
-
-    if (!selectedTopic || !originalDraft) {
-      setError("未找到可处理的原始正文。");
-      return;
-    }
-
-    const action = "humanize_draft";
+    const action = "format_draft";
     const operationId = retryOperationId ?? createOperationId();
-    const uiRequestSequence = startRequest(action, "正在去掉正文里的机器腔...");
+    const uiRequestSequence = startRequest(
+      action,
+      "正在用 AI 整理 Markdown 和模块排版..."
+    );
 
     try {
       setError(null);
-      const result = await humanizeDraft(
+      const result = await requestDraftFormatting(
         state.workflowId,
-        {
-          operationId,
-          draft: originalDraft,
-          coreViewpoint: selectedTopic.coreViewpoint,
-          briefPersona: state.brief.persona,
-          briefTone: state.brief.tone,
-          briefDropOffPoint: state.brief.dropOffPoint,
-        },
+        { operationId, draft: selectedDraft },
         recordProgress(uiRequestSequence),
-        setCreditBalance,
         confirmWorkflowId
       );
       if (!isActiveRequest(uiRequestSequence)) {
@@ -519,7 +523,7 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
       }
       updateState(
         transitionWorkflow(state, {
-          type: "draft_humanized",
+          type: "draft_formatted",
           draft: result.draft,
         })
       );
@@ -529,7 +533,71 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
         action,
         operationId,
         err,
-        "去 AI 味失败，原始正文未受影响。"
+        "AI 排版失败，当前正文未受影响。"
+      );
+    } finally {
+      finishRequest(uiRequestSequence);
+    }
+  };
+
+  const handleCompleteDraftMaterials = async (retryOperationId?: string) => {
+    if (!state.brief) {
+      setError("未找到当前 Brief，无法补充正文素材。");
+      return;
+    }
+
+    const selectedTopic = getSelectedTopic(state);
+    const selectedDraft = state.draftVersions.find(
+      (draft) => draft.id === state.selectedDraftVersionId
+    );
+
+    if (!selectedTopic || !selectedDraft) {
+      setError("未找到当前选题或正文，请重新选择正文版本。");
+      return;
+    }
+
+    const action = "complete_draft_materials";
+    const operationId = retryOperationId ?? createOperationId();
+    const uiRequestSequence = startRequest(
+      action,
+      "正在根据现有资料补充正文素材..."
+    );
+
+    try {
+      setError(null);
+      const result = await requestDraftMaterialCompletion(
+        state.workflowId,
+        {
+          operationId,
+          draft: selectedDraft,
+          topicLabel: selectedTopic.label,
+          topicAngle: selectedTopic.angle,
+          coreViewpoint: selectedTopic.coreViewpoint,
+          briefObjective: state.brief.objective,
+          briefAudience: state.brief.audience,
+          briefPersona: state.brief.persona,
+          outline: state.outline,
+          searchContext: state.topicSearchContext,
+        },
+        recordProgress(uiRequestSequence),
+        confirmWorkflowId
+      );
+      if (!isActiveRequest(uiRequestSequence)) {
+        return;
+      }
+      updateState(
+        transitionWorkflow(state, {
+          type: "draft_materials_completed",
+          draft: result.draft,
+        })
+      );
+    } catch (err) {
+      failRequest(
+        uiRequestSequence,
+        action,
+        operationId,
+        err,
+        "AI 补充素材失败，当前正文未受影响。"
       );
     } finally {
       finishRequest(uiRequestSequence);
@@ -749,8 +817,14 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
       return;
     }
 
-    if (action === "humanize_draft") {
-      void handleHumanizeDraft(operationId);
+
+    if (action === "format_draft") {
+      void handleFormatDraft(operationId);
+      return;
+    }
+
+    if (action === "complete_draft_materials") {
+      void handleCompleteDraftMaterials(operationId);
       return;
     }
 
@@ -797,8 +871,10 @@ export function useWorkflow(initialCreditBalance: CreditBalance | null = null) {
     handleStructureTypeChange,
     handleConfirmBrief,
     handleGenerateDrafts,
-    handleHumanizeDraft,
+    handleFormatDraft,
+    handleCompleteDraftMaterials,
     handleSelectDraft,
+    handleUpdateDraft,
     handleGenerateMeta,
     handleContinueToFinal,
     handleBackToMeta,

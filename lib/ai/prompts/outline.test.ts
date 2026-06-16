@@ -37,6 +37,8 @@ describe("buildOutlinePrompt", () => {
     expect(prompt.userPrompt).toContain("heading 控制在 24 个字以内");
     expect(prompt.userPrompt).toContain("corePoint 控制在 1 句话内");
     expect(prompt.userPrompt).toContain("不要写多余铺垫");
+    expect(prompt.userPrompt).toContain("只能基于上游已确认的信息搭结构");
+    expect(prompt.userPrompt).toContain("不得新增用户没有提到的年份、身份、数据、经历或案例");
   });
 
   it("injects search context when searchEnabled is true", () => {

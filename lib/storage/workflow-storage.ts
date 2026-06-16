@@ -54,6 +54,12 @@ function normalizeWorkflowState(
   rawState: Partial<WorkflowState>
 ): WorkflowState {
   const baseState = createInitialWorkflowState();
+  const restoredState = {
+    ...rawState,
+  } as Partial<WorkflowState> & {
+    draftFormattingByVersion?: unknown;
+  };
+  delete restoredState.draftFormattingByVersion;
   const parsedBrief = rawState.brief
     ? briefSchema.safeParse(rawState.brief)
     : null;
@@ -65,9 +71,10 @@ function normalizeWorkflowState(
     outlineSectionSchema.parse(section)
   );
   const fallbackOutlineId = outline[0]?.id ?? "section-1";
+  const draftVersions = rawState.draftVersions ?? baseState.draftVersions;
   const nextState: WorkflowState = {
     ...baseState,
-    ...rawState,
+    ...restoredState,
     workflowId:
       typeof rawState.workflowId === "string" && UUID_PATTERN.test(rawState.workflowId)
         ? rawState.workflowId
@@ -98,7 +105,7 @@ function normalizeWorkflowState(
             : fallbackOutlineId,
       })
     ),
-    draftVersions: rawState.draftVersions ?? baseState.draftVersions,
+    draftVersions,
     titleOptions: rawState.titleOptions ?? baseState.titleOptions,
     summaryOptions: rawState.summaryOptions ?? baseState.summaryOptions,
     coverSuggestion:

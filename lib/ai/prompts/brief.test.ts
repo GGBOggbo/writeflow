@@ -27,6 +27,8 @@ describe("buildBriefPrompt", () => {
     expect(prompt.userPrompt).toContain("SEO 强制传递");
     expect(prompt.userPrompt).toContain("constraints 数组中单列一条指令");
     expect(prompt.userPrompt).toMatch(/不要改写成其他主题|禁止偏离选题/);
+    expect(prompt.userPrompt).toContain("只能基于上游已确认的信息展开");
+    expect(prompt.userPrompt).toContain("不得新增用户没有提到的年份、身份、数据、经历或案例");
   });
 
   it("injects search context when searchEnabled is true", () => {

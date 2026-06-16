@@ -66,6 +66,35 @@ export type DraftVersion = {
   content: string;
 };
 
+export const FORMATTING_BLOCK_TYPES = [
+  "paragraph",
+  "heading",
+  "quote",
+  "pain",
+  "transition",
+  "list",
+  "comparison",
+  "cta",
+] as const;
+
+export type FormattingBlockType = (typeof FORMATTING_BLOCK_TYPES)[number];
+
+export type FormattingBlock = {
+  id: string;
+  type: FormattingBlockType;
+  text: string;
+};
+
+export const WECHAT_FORMAT_THEMES = [
+  "spring-fresh",
+  "autumn-warm",
+  "ocean-calm",
+  "claude-warm-paper",
+  "editorial-paper",
+] as const;
+
+export type WechatFormatTheme = (typeof WECHAT_FORMAT_THEMES)[number];
+
 export type MetaCard = {
   id: string;
   label: string;
@@ -119,7 +148,13 @@ export type WorkflowEvent =
       drafts: DraftVersion[];
       searchContext?: import("@/lib/search/types").SearchReferenceBundle;
     }
-  | { type: "draft_humanized"; draft: DraftVersion }
+  | { type: "draft_formatted"; draft: DraftVersion }
+  | { type: "draft_materials_completed"; draft: DraftVersion }
+  | {
+      type: "draft_updated";
+      draftVersionId: string;
+      content: string;
+    }
   | {
       type: "meta_generated";
       titles: MetaCard[];

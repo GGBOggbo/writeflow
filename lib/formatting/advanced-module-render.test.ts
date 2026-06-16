@@ -266,7 +266,195 @@ describe("renderAdvancedModule", () => {
 
     expect(html).toContain("font-family:");
     expect(html).toContain("border-radius:");
-    expect(html).toContain("#1f5f46");
+    expect(html).toContain("#b3593b");
+    expect(html).not.toContain("#1f5f46");
+  });
+
+  it("renders CTA with the archived warm-paper action skeleton", () => {
+    const html = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.cta.markdown)
+    );
+
+    expect(html).toContain("保存灵感");
+    expect(html).toContain("直接套用");
+    expect(html).toContain("继续体验");
+    expect(html).toContain(
+      "grid-template-columns:repeat(2,minmax(0,1fr))"
+    );
+    expect(html).toContain("#ead6cc");
+    expect(html).toContain("#b2583b");
+    expect(html).not.toContain("#1f5f46");
+  });
+
+  it("renders verdict as a compact warm-paper judgment card", () => {
+    const html = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.verdict.markdown)
+    );
+
+    expect(html).toContain("最终判断");
+    expect(html).toContain("width:11px");
+    expect(html).toContain(
+      "linear-gradient(135deg,#ead6cc 0%,#faf9f5 48%,#f7f7f7 100%)"
+    );
+    expect(html).toContain("font-size:17px");
+    expect(html).toContain("font-size:15px");
+    expect(html).not.toContain("border:2px solid");
+  });
+
+  it("uses distinct reference skeletons for entry and section modules", () => {
+    const hero = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.hero.markdown)
+    );
+    const part = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.part.markdown)
+    );
+    const labelTitle = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES["label-title"].markdown)
+    );
+
+    expect(hero).toContain("width:100%");
+    expect(hero).toContain(
+      "linear-gradient(180deg,#ead6cc 0%,#faf9f5 46%,#faf9f5 100%)"
+    );
+    expect(part).toContain("width:56px");
+    expect(part).toContain("border-radius:999px");
+    expect(labelTitle).toContain("<h4");
+  });
+
+  it("uses responsive grid skeletons for evidence modules", () => {
+    const cards = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.cards.markdown)
+    );
+    const metrics = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.metrics.markdown)
+    );
+    const people = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.people.markdown)
+    );
+
+    expect(cards).toContain(
+      "grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"
+    );
+    expect(metrics).toContain(
+      "grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"
+    );
+    expect(people).toContain(
+      "grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"
+    );
+  });
+
+  it("uses compact judgment and summary reference skeletons", () => {
+    const quote = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.quote.markdown)
+    );
+    const summary = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.summary.markdown)
+    );
+    const faq = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.faq.markdown)
+    );
+
+    expect(quote).toContain("font-size:22px");
+    expect(summary).toContain("border-left:3px solid #b3593b");
+    expect(faq).toContain(">Q<");
+    expect(faq).toContain(">A<");
+  });
+
+  it("uses reference image composition skeletons", () => {
+    const imageText = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES["image-text"].markdown)
+    );
+    const imageCompare = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES["image-compare"].markdown)
+    );
+    const imageAnnotate = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES["image-annotate"].markdown)
+    );
+
+    expect(imageText).toContain("display:flex;flex-wrap:wrap");
+    expect(imageCompare).toContain(
+      "grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"
+    );
+    expect(imageAnnotate).toContain("aspect-ratio:4/3");
+  });
+
+  it("uses reference utility and ending skeletons", () => {
+    const series = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.series.markdown)
+    );
+    const subscribe = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.subscribe.markdown)
+    );
+    const toc = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.toc.markdown)
+    );
+
+    expect(series).toContain(
+      "linear-gradient(180deg,#ead6cc 0%,#f7f7f7 100%)"
+    );
+    expect(subscribe).toContain(
+      "grid-template-columns:repeat(2,minmax(0,1fr))"
+    );
+    expect(toc).toContain("flex-direction:column");
+  });
+
+  it("uses the archived utility module skeletons instead of generic shells", () => {
+    const infographic = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.infographic.markdown)
+    );
+    const checklist = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.checklist.markdown)
+    );
+    const toolbox = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.toolbox.markdown)
+    );
+    const specs = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.specs.markdown)
+    );
+    const imageSteps = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES["image-steps"].markdown)
+    );
+    const notice = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.notice.markdown)
+    );
+
+    expect(infographic).toContain("data-infographic-type=");
+    expect(infographic).toContain("min-height:238px");
+    expect(checklist).toContain("text-decoration:line-through");
+    expect(checklist).toContain("flex-direction:column;gap:12px");
+    expect(toolbox).toContain("linear-gradient(180deg,#faf9f5 0%,#f7f7f7 100%)");
+    expect(toolbox).toContain("打开资源 →");
+    expect(specs).toContain("grid-template-columns:1fr auto");
+    expect(imageSteps).toContain("min-height:200px");
+    expect(imageSteps).toContain("flex-direction:column;align-items:stretch");
+    expect(notice).toContain("grid-template-columns:96px 1fr");
+  });
+
+  it("uses the archived media, dialogue, and author skeletons", () => {
+    const gallery = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.gallery.markdown)
+    );
+    const longimage = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.longimage.markdown)
+    );
+    const dialogue = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES.dialogue.markdown)
+    );
+    const author = renderAdvancedModule(
+      parseModule(MODULE_SAMPLES["author-card"].markdown)
+    );
+
+    expect(gallery).toContain("scroll-snap-type:x mandatory");
+    expect(gallery).toContain("flex:0 0 78%");
+    expect(gallery).toContain("aspect-ratio:4/3");
+    expect(longimage).toContain("max-height:min(75vh,600px)");
+    expect(longimage).toContain("linear-gradient(135deg,#ead6cc,#faf9f5)");
+    expect(dialogue).toContain("flex-direction:row-reverse");
+    expect(dialogue).toContain("width:32px;height:32px");
+    expect(author).toContain("width:46px;height:46px");
+    expect(author).toContain(
+      "linear-gradient(135deg,#ead6cc 0%,#faf9f5 42%,#f7f7f7 100%)"
+    );
   });
 
   it("keeps safe images and links while rejecting executable URLs", () => {

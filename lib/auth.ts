@@ -1,20 +1,29 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
-import { Pool } from "@neondatabase/serverless";
+import { getDatabaseConfig, getPostgresPool, getSqliteDatabase } from "./database";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+const databaseConfig = getDatabaseConfig();
+const database =
+  databaseConfig.provider === "sqlite"
+    ? getSqliteDatabase()
+    : {
+        db: getPostgresPool(),
+        type: "postgres" as const,
+      };
 
 export const auth = betterAuth({
-  database: pool,
+  database,
+  baseURL: process.env.BETTER_AUTH_URL,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
     autoSignIn: true,
   },
-  accountLinking: {
-    enabled: true,
-    trustedProviders: ["google", "github"],
-    requireLocalEmailVerified: false,
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google", "github"],
+    },
   },
   socialProviders: {
     google: {

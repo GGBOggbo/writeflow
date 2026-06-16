@@ -173,9 +173,24 @@ export const mockAIProvider: AIProvider = {
     };
   },
 
-  async humanizeDrafts({ drafts }) {
+  async completeDraftMaterials({ draft }) {
     await wait(80);
-    return { drafts };
+    return {
+      drafts: [
+        {
+          ...draft,
+          content: draft.content.replace(
+            /【💡需要你补充：[^】]+】/g,
+            "设想一个常见场景：团队先用低成本方案验证完整流程，再根据真实反馈决定是否增加投入。"
+          ),
+        },
+      ],
+    };
+  },
+
+  async formatDraftMarkdown(content) {
+    await wait(80);
+    return content;
   },
 
   async generateTitlesAndSummaries({

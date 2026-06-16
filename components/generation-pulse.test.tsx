@@ -51,17 +51,18 @@ describe("GenerationPulse", () => {
     expect(screen.queryByText("去掉机器腔")).not.toBeInTheDocument();
   });
 
-  it("shows a dedicated timeline for the paid humanization action", () => {
+
+  it("shows a dedicated timeline for free AI Markdown formatting", () => {
     render(
       <GenerationPulse
         loading
-        action="humanize_draft"
-        message="正在去掉正文里的机器腔..."
+        action="format_draft"
+        message="正在用 AI 整理 Markdown 和模块排版..."
       />
     );
 
-    expect(screen.getByText("检查机器痕迹")).toBeInTheDocument();
-    expect(screen.getByText("去掉机器腔")).toBeInTheDocument();
+    expect(screen.getByText("理解正文节奏")).toBeInTheDocument();
+    expect(screen.getByText("整理 Markdown 与模块")).toBeInTheDocument();
   });
 
   it("marks steps from real backend progress events instead of guessing progress", () => {

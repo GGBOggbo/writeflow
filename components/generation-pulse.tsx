@@ -7,7 +7,8 @@ type GenerationAction =
   | "select_topic"
   | "confirm_brief"
   | "generate_drafts"
-  | "humanize_draft"
+  | "format_draft"
+  | "complete_draft_materials"
   | "generate_meta";
 
 type GenerationPulseStep = {
@@ -67,9 +68,36 @@ const actionTimelines: Record<GenerationAction, GenerationPulseStep[]> = {
     { label: "吸收评论卡点", detail: "把高赞评论转成读者需求", eventIds: ["benchmark_summary_completed"] },
     { label: "生成正文初稿", detail: "按大纲和人设组装成稿", eventIds: ["draft_generation_started", "draft_generation_completed"] },
   ],
-  humanize_draft: [
-    { label: "检查机器痕迹", detail: "识别公式句、宣传腔和机械节奏", eventIds: ["draft_humanization_started"] },
-    { label: "去掉机器腔", detail: "保留原意，重新整理句式与节奏", eventIds: ["draft_humanization_started", "draft_humanization_completed"] },
+  format_draft: [
+    {
+      label: "理解正文节奏",
+      detail: "识别小标题、重点句和适合卡片呈现的内容",
+      eventIds: ["markdown_formatting_started"],
+    },
+    {
+      label: "整理 Markdown 与模块",
+      detail: "生成可编辑、可直接预览的排版版",
+      eventIds: [
+        "markdown_formatting_started",
+        "markdown_formatting_completed",
+        "markdown_formatting_degraded",
+      ],
+    },
+  ],
+  complete_draft_materials: [
+    {
+      label: "检查素材槽位",
+      detail: "判断哪些内容有现有资料支持",
+      eventIds: ["draft_material_completion_started"],
+    },
+    {
+      label: "保守补充正文",
+      detail: "不虚构经历，无依据的槽位继续保留",
+      eventIds: [
+        "draft_material_completion_started",
+        "draft_material_completion_completed",
+      ],
+    },
   ],
   generate_meta: [
     { label: "读取正文", detail: "只基于已选正文包装", eventIds: ["meta_generation_started"] },

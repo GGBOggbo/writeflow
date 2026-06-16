@@ -47,6 +47,7 @@ export function buildBriefPrompt(input: GenerateBriefInput) {
       searchContext,
       "",
       "请只围绕这个已选选题生成 brief，禁止偏离选题，禁止改写成时间管理、职场成长或任何未在上方出现的话题。",
+      "只能基于上游已确认的信息展开，不得新增用户没有提到的年份、身份、数据、经历或案例。",
       "",
       "请输出以下维度，并严格符合 Schema：",
       "1. 核心目标（objective）：必须直接服务于这个选题最想打破的认知或最想建立的判断，不能写成泛泛的知识科普。",

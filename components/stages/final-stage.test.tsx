@@ -64,6 +64,8 @@ const finalizeState: Partial<WorkflowState> = {
     { id: "summary-1", label: "摘要方案 A", content: "摘要 A" },
     { id: "summary-2", label: "摘要方案 B", content: "摘要 B" },
   ],
+  coverSuggestion: "优先使用真实工作台照片。",
+  coverImagePrompt: "【公众号封面 · 900×383】\n画面概念：清晨办公室",
   finalSelection: {
     draftVersionId: null,
     titleId: "title-1",
@@ -96,5 +98,20 @@ describe("FinalStage", () => {
     await user.click(screen.getByRole("button", { name: /返回标题摘要/i }));
 
     expect(await screen.findByText(/包装定案：标题、摘要与封面表达/i)).toBeInTheDocument();
+  });
+
+  it("keeps the AI cover prompt collapsed until the user asks for it", async () => {
+    const user = userEvent.setup();
+    renderWithState(<ManuscriptPanel />, finalizeState);
+
+    expect(await screen.findByText("优先使用真实工作台照片。")).toBeInTheDocument();
+    expect(screen.queryByText(/画面概念：清晨办公室/)).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "生成 AI 封面提示词" })
+    );
+
+    expect(screen.getByText(/画面概念：清晨办公室/)).toBeInTheDocument();
+    expect(screen.getByText(/不会再次调用 AI，不扣积分/)).toBeInTheDocument();
   });
 });

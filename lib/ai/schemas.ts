@@ -269,21 +269,34 @@ export const draftResponseSchema = z.object({
   searchContext: searchReferenceBundleSchema.optional(),
 });
 
-export const humanizeDraftRequestSchema = z.object({
+export const formatDraftRequestSchema = z.object({
   operationId: operationIdSchema,
   draft: draftVersionSchema,
-  coreViewpoint: z.string().trim().min(1),
-  briefPersona: z.string().trim().min(1),
-  briefTone: z.string().trim().min(1),
-  briefDropOffPoint: z.string().trim().min(1),
 });
 
-export const humanizeDraftResponseSchema = z.object({
+export const formatDraftResponseSchema = z.object({
   draft: draftVersionSchema,
 });
 
-export const humanizedDraftResponseSchema = z.object({
-  drafts: z.array(draftVersionSchema).min(1),
+export const completeDraftMaterialsRequestSchema = z.object({
+  operationId: operationIdSchema,
+  draft: draftVersionSchema,
+  topicLabel: z.string().trim().min(1),
+  topicAngle: z.string().trim().min(1),
+  coreViewpoint: z.string().trim().min(1),
+  briefObjective: z.string().trim().min(1),
+  briefAudience: z.string().trim().min(1),
+  briefPersona: z.string().trim().min(1),
+  outline: z.array(outlineSectionSchema).min(1),
+  searchContext: searchReferenceBundleSchema.nullable().optional(),
+});
+
+export const completeDraftMaterialsResponseSchema = z.object({
+  draft: draftVersionSchema,
+});
+
+export const completedDraftMaterialsResponseSchema = z.object({
+  drafts: z.array(draftVersionSchema).length(1),
 });
 
 export const metaRequestSchema = z.object({

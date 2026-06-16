@@ -1,10 +1,12 @@
 import type {
+  CompleteDraftMaterialsInput,
+  CompleteDraftMaterialsOutput,
+  FormatDraftInput,
+  FormatDraftOutput,
   GenerateBriefInput,
   GenerateBriefOutput,
   GenerateDraftInput,
   GenerateDraftOutput,
-  HumanizeDraftInput,
-  HumanizeDraftOutput,
   GenerateOutlineInput,
   GenerateOutlineOutput,
   GenerateTitlesAndSummariesInput,
@@ -16,8 +18,9 @@ import type { WorkflowProgressEvent } from "@/lib/progress/types";
 import type { CreditBalance } from "@/types/credits";
 import {
   briefResponseSchema,
+  completeDraftMaterialsResponseSchema,
   draftResponseSchema,
-  humanizeDraftResponseSchema,
+  formatDraftResponseSchema,
   metaResponseSchema,
   outlineResponseSchema,
   topicResponseSchema,
@@ -189,20 +192,36 @@ export function generateDraft(
   );
 }
 
-export function humanizeDraft(
+export function formatDraft(
   workflowId: string,
-  input: MeteredInput<HumanizeDraftInput>,
+  input: MeteredInput<FormatDraftInput>,
   onProgress?: (event: WorkflowProgressEvent) => void,
-  onCredits?: (balance: CreditBalance) => void,
   onWorkflowId?: ConfirmWorkflowId
-): Promise<HumanizeDraftOutput> {
+): Promise<FormatDraftOutput> {
   return postJsonStream(
-    "/api/ai/humanize/stream",
+    "/api/ai/format-draft/stream",
     workflowId,
     input,
-    (data) => humanizeDraftResponseSchema.parse(data),
+    (data) => formatDraftResponseSchema.parse(data),
     onProgress,
-    onCredits,
+    undefined,
+    onWorkflowId
+  );
+}
+
+export function completeDraftMaterials(
+  workflowId: string,
+  input: MeteredInput<CompleteDraftMaterialsInput>,
+  onProgress?: (event: WorkflowProgressEvent) => void,
+  onWorkflowId?: ConfirmWorkflowId
+): Promise<CompleteDraftMaterialsOutput> {
+  return postJsonStream(
+    "/api/ai/complete-materials/stream",
+    workflowId,
+    input,
+    (data) => completeDraftMaterialsResponseSchema.parse(data),
+    onProgress,
+    undefined,
     onWorkflowId
   );
 }

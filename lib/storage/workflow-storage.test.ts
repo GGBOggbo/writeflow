@@ -238,4 +238,28 @@ describe("workflow storage", () => {
     expect(restored?.finalSelection.titleId).toBe("title-1");
     expect(restored?.finalSelection.summaryId).toBe("summary-1");
   });
+
+  it("drops legacy AI formatting state on restore", () => {
+    const state = createInitialWorkflowState();
+    state.draftVersions = [
+      { id: "draft-1", label: "原始版", content: "正文内容" },
+    ];
+    state.selectedDraftVersionId = "draft-1";
+    window.localStorage.setItem(
+      "ai-writing-mvp-workflow",
+      JSON.stringify({
+        ...state,
+        draftFormattingByVersion: {
+          "draft-1": {
+            draftVersionId: "draft-1",
+            blocks: [{ id: "b1", type: "quote", text: "正文内容" }],
+            selectedTheme: "warm-orange",
+            generatedAt: "2026-06-13T00:00:00.000Z",
+          },
+        },
+      })
+    );
+
+    expect(loadWorkflowState()).not.toHaveProperty("draftFormattingByVersion");
+  });
 });

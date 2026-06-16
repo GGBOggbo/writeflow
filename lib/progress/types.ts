@@ -19,8 +19,11 @@ export type WorkflowProgressStepId =
   | "benchmark_summary_completed"
   | "draft_generation_started"
   | "draft_generation_completed"
-  | "draft_humanization_started"
-  | "draft_humanization_completed"
+  | "markdown_formatting_started"
+  | "markdown_formatting_completed"
+  | "markdown_formatting_degraded"
+  | "draft_material_completion_started"
+  | "draft_material_completion_completed"
   | "meta_generation_started"
   | "meta_generation_completed";
 

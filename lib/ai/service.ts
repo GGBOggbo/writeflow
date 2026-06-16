@@ -8,12 +8,14 @@
  */
 
 import type {
+  CompleteDraftMaterialsInput,
+  CompleteDraftMaterialsOutput,
+  FormatDraftInput,
+  FormatDraftOutput,
   GenerateBriefInput,
   GenerateBriefOutput,
   GenerateDraftInput,
   GenerateDraftOutput,
-  HumanizeDraftInput,
-  HumanizeDraftOutput,
   GenerateOutlineInput,
   GenerateOutlineOutput,
   GenerateTitlesAndSummariesInput,
@@ -36,13 +38,18 @@ import {
 import type { TopicSearchPlan } from "@/lib/search/topic-search-plan";
 import {
   briefResponseSchema,
+  completeDraftMaterialsResponseSchema,
   draftResponseSchema,
-  humanizeDraftResponseSchema,
+  formatDraftResponseSchema,
   metaResponseSchema,
   outlineResponseSchema,
   topicResponseSchema,
 } from "./schemas";
 import { formatSearchReference } from "./prompts/search-context";
+import {
+  buildBasicMarkdownFallback,
+  layoutDraftModules,
+} from "./draft-module-layout";
 
 function logPreview(value: string, limit = 120) {
   return value.replace(/[\n\r\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, limit);
@@ -104,9 +111,12 @@ function sanitizeAddedNumericTerms(
   });
 }
 
-function topicReferenceStats(searchContext: SearchReferenceBundle | null) {
+function topicReferenceStats(
+  searchContext: SearchReferenceBundle | null,
+  promptReferenceLimit = 4
+) {
   const results = searchContext?.results ?? [];
-  const promptResults = results.slice(0, 4);
+  const promptResults = results.slice(0, promptReferenceLimit);
   const history = results.filter((result) => Boolean(result.engagementMetrics)).length;
 
   return {
@@ -153,7 +163,7 @@ function reusableSearchContext(
   log.info(scope, "search context reused", {
     event: "search.context.reused",
     stage: scope,
-    ...topicReferenceStats(reusable),
+    ...topicReferenceStats(reusable, scope === "draft" ? 8 : 4),
     status: reusable.status,
   });
 
@@ -173,7 +183,7 @@ function getProvider(): AIProvider {
 function getDeepDiveResults(searchContext: SearchReferenceBundle | null) {
   return (searchContext?.results ?? [])
     .filter((result) => result.articleHtml)
-    .slice(0, 2);
+    .slice(0, 8);
 }
 
 function attachBenchmarkSummaries(
@@ -188,43 +198,6 @@ function attachBenchmarkSummaries(
   };
 }
 
-function extractMaterialPlaceholders(content: string) {
-  return content.match(/【💡需要你补充：[^】]*】/g) ?? [];
-}
-
-function assertHumanizedDraftsPreserveSource(
-  source: GenerateDraftOutput["drafts"],
-  humanized: GenerateDraftOutput["drafts"]
-) {
-  if (source.length !== humanized.length) {
-    throw new Error("去 AI 润色改变了正文版本数量。");
-  }
-
-  source.forEach((draft, index) => {
-    const rewritten = humanized[index];
-
-    if (
-      !rewritten ||
-      rewritten.id !== draft.id ||
-      rewritten.label !== draft.label
-    ) {
-      throw new Error("去 AI 润色改变了正文版本身份。");
-    }
-
-    const sourcePlaceholders = extractMaterialPlaceholders(draft.content);
-    const rewrittenPlaceholders = extractMaterialPlaceholders(rewritten.content);
-
-    if (
-      sourcePlaceholders.length !== rewrittenPlaceholders.length ||
-      sourcePlaceholders.some(
-        (placeholder, placeholderIndex) =>
-          rewrittenPlaceholders[placeholderIndex] !== placeholder
-      )
-    ) {
-      throw new Error("去 AI 润色改变了素材占位符。");
-    }
-  });
-}
 
 function labelOriginalDrafts(drafts: GenerateDraftOutput["drafts"]) {
   return drafts.map((draft) => ({
@@ -501,40 +474,161 @@ export async function generateDraft(
   });
 }
 
-export async function humanizeDraft(
-  input: HumanizeDraftInput,
+export async function formatDraft(
+  input: FormatDraftInput,
   options?: { onProgress?: ProgressReporter }
-): Promise<HumanizeDraftOutput> {
+): Promise<FormatDraftOutput> {
+  const provider = getProvider();
+  const startedAt = Date.now();
+
   options?.onProgress?.({
-    stepId: "draft_humanization_started",
-    label: "去掉机器腔",
-    detail: "终审句式、节奏和表达痕迹",
+    stepId: "markdown_formatting_started",
+    label: "AI 整理 Markdown 与模块",
+    detail: "按公众号手机阅读节奏整理结构和重点",
   });
 
-  const providerResult = await getProvider().humanizeDrafts({
-    drafts: [input.draft],
-    coreViewpoint: input.coreViewpoint,
-    briefPersona: input.briefPersona,
-    briefTone: input.briefTone,
-    briefDropOffPoint: input.briefDropOffPoint,
-  });
-  assertHumanizedDraftsPreserveSource([input.draft], providerResult.drafts);
-  const rewritten = providerResult.drafts[0];
+  const layout = await layoutDraftModules(
+    input.draft.content,
+    (content, layoutOptions) =>
+      layoutOptions
+        ? provider.formatDraftMarkdown(content, layoutOptions)
+        : provider.formatDraftMarkdown(content)
+  );
 
-  if (!rewritten) {
-    throw new Error("去 AI 润色没有返回正文。");
+  if (layout.source === "local_fallback") {
+    log.warn("draft", "Local Markdown fallback completed", {
+      event: "draft.markdown.fallback.completed",
+      status: "degraded",
+      source: layout.source,
+      attempts: layout.attempts,
+      failures: layout.failures,
+      moduleCount: layout.moduleCount,
+      moduleNames: layout.moduleNames,
+      ctaCount: layout.ctaCount,
+      degradedModules: layout.degradedModules,
+      degradationReasons: layout.degradationReasons,
+      durationMs: Date.now() - startedAt,
+      inputChars: input.draft.content.length,
+      outputChars: layout.content.length,
+    });
+    options?.onProgress?.({
+      stepId: "markdown_formatting_degraded",
+      label: "AI 排版未通过，已使用本地基础排版",
+    });
+  } else {
+    log.info("draft", "Markdown formatting completed", {
+      event: "draft.markdown.completed",
+      status: "success",
+      source: layout.source,
+      attempts: layout.attempts,
+      failures: layout.failures,
+      moduleCount: layout.moduleCount,
+      moduleNames: layout.moduleNames,
+      ctaCount: layout.ctaCount,
+      degradedModules: layout.degradedModules,
+      degradationReasons: layout.degradationReasons,
+      durationMs: Date.now() - startedAt,
+      inputChars: input.draft.content.length,
+      outputChars: layout.content.length,
+    });
+    options?.onProgress?.({
+      stepId: "markdown_formatting_completed",
+      label: "AI 排版完成",
+    });
   }
 
+  return formatDraftResponseSchema.parse({
+    draft: {
+      ...input.draft,
+      id: `${input.draft.id}-formatted-${crypto.randomUUID()}`,
+      label: "排版版",
+      content: layout.content,
+    },
+  });
+}
+
+const MATERIAL_PLACEHOLDER_PATTERN = /【💡需要你补充：[^】]+】/g;
+
+function assertMaterialCompletionPreservesDraft(
+  source: string,
+  candidate: string
+) {
+  const placeholders = source.match(MATERIAL_PLACEHOLDER_PATTERN) ?? [];
+  if (placeholders.length === 0) {
+    throw new Error("当前正文没有需要补充的素材占位符。");
+  }
+
+  const fixedSegments = source.split(MATERIAL_PLACEHOLDER_PATTERN);
+  let cursor = 0;
+
+  if (!candidate.startsWith(fixedSegments[0] ?? "")) {
+    throw new Error("AI 补充素材改变了占位符之外的正文。");
+  }
+  cursor = (fixedSegments[0] ?? "").length;
+
+  for (let index = 0; index < placeholders.length; index += 1) {
+    const nextFixed = fixedSegments[index + 1] ?? "";
+    const nextIndex = nextFixed
+      ? candidate.indexOf(nextFixed, cursor)
+      : candidate.length;
+
+    if (nextIndex < cursor) {
+      throw new Error("AI 补充素材改变了占位符之外的正文。");
+    }
+
+    const replacement = candidate.slice(cursor, nextIndex).trim();
+    const placeholder = placeholders[index] ?? "";
+    if (
+      replacement !== placeholder &&
+      replacement.replace(/\s+/g, "").length < 12
+    ) {
+      throw new Error("AI 删除了素材占位符，但没有提供有效内容。");
+    }
+
+    cursor = nextIndex + nextFixed.length;
+  }
+
+  if (cursor !== candidate.length) {
+    throw new Error("AI 补充素材改变了占位符之外的正文。");
+  }
+}
+
+export async function completeDraftMaterials(
+  input: CompleteDraftMaterialsInput,
+  options?: { onProgress?: ProgressReporter }
+): Promise<CompleteDraftMaterialsOutput> {
   options?.onProgress?.({
-    stepId: "draft_humanization_completed",
-    label: "去掉机器腔完成",
+    stepId: "draft_material_completion_started",
+    label: "补充正文素材",
+    detail: "只补写有现有资料支持的内容",
   });
 
-  return humanizeDraftResponseSchema.parse({
+  const providerResult = await getProvider().completeDraftMaterials(input);
+  const completed = providerResult.drafts[0];
+  if (!completed?.content.trim()) {
+    throw new Error("AI 补充素材没有返回正文。");
+  }
+
+  assertMaterialCompletionPreservesDraft(input.draft.content, completed.content);
+  if (MATERIAL_PLACEHOLDER_PATTERN.test(completed.content)) {
+    MATERIAL_PLACEHOLDER_PATTERN.lastIndex = 0;
+    throw new Error("AI 补充后的正文仍然包含需要补充的素材占位符。");
+  }
+  MATERIAL_PLACEHOLDER_PATTERN.lastIndex = 0;
+
+  options?.onProgress?.({
+    stepId: "draft_material_completion_completed",
+    label: "正文素材补充完成",
+  });
+
+  const normalizedContent = buildBasicMarkdownFallback(completed.content);
+
+  return completeDraftMaterialsResponseSchema.parse({
     draft: {
-      ...rewritten,
-      id: `${input.draft.id}-humanized`,
-      label: "去 AI 版",
+      ...completed,
+      content: normalizedContent,
+      id: `${input.draft.id}-materials-${crypto.randomUUID()}`,
+      label: "AI 补充版",
     },
   });
 }

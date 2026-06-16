@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { parseAdvancedMarkdown } from "@/lib/markdown/advanced-modules";
+import { renderAdvancedModule } from "./advanced-module-render";
 import { normalizeWechatHtml } from "./wechat-compat";
 
 function parse(html: string) {
@@ -173,5 +175,34 @@ describe("normalizeWechatHtml", () => {
     expect(output).toContain("脚注");
     expect(output).not.toContain("data-mpa-action-id");
     expect(output).not.toContain("class=");
+  });
+
+  it("stacks CTA action cards for WeChat without losing their labels", () => {
+    const [node] = parseAdvancedMarkdown(`:::cta
+title: 先把主流程完整跑一遍
+note: BUILD WITH STRUCTURE
+:::`);
+    if (!node || node.type !== "module") {
+      throw new Error("Expected CTA module");
+    }
+
+    const output = normalizeWechatHtml(
+      `<article>${renderAdvancedModule(node)}</article>`
+    );
+    const doc = parse(output);
+    const actionCards = doc.querySelectorAll(
+      'article > section > section > section'
+    );
+
+    expect(output).toContain("保存灵感");
+    expect(output).toContain("直接套用");
+    expect(output).toContain("继续体验");
+    expect(output).not.toMatch(
+      /display:\s*grid|grid-template-columns|data-mpa-cta-actions/i
+    );
+    expect(actionCards).toHaveLength(3);
+    for (const card of actionCards) {
+      expect((card as HTMLElement).style.width).toBe("100%");
+    }
   });
 });

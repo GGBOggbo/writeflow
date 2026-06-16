@@ -274,25 +274,87 @@ describe("workflow state machine", () => {
     expect(next.selectedDraftVersionId).toBe("draft-1");
   });
 
-  it("appends and selects a separately generated humanized draft", () => {
+
+  it("appends and selects an AI material completion without replacing the source", () => {
     const state = {
       ...createInitialWorkflowState(),
       draftVersions: [
-        { id: "draft-1", label: "原始版", content: "原始正文" },
+        {
+          id: "draft-1",
+          label: "原始版",
+          content: "正文。【💡需要你补充：公开背景】",
+        },
       ],
       selectedDraftVersionId: "draft-1",
     };
     const next = transitionWorkflow(state, {
-      type: "draft_humanized",
+      type: "draft_materials_completed",
       draft: {
-        id: "draft-1-humanized",
-        label: "去 AI 版",
-        content: "自然正文",
+        id: "draft-1-materials-result",
+        label: "AI 补充版",
+        content: "正文。这里补充了公开背景。",
       },
     });
 
-    expect(next.draftVersions).toHaveLength(2);
-    expect(next.selectedDraftVersionId).toBe("draft-1-humanized");
+    expect(next.draftVersions).toEqual([
+      state.draftVersions[0],
+      {
+        id: "draft-1-materials-result",
+        label: "AI 补充版",
+        content: "正文。这里补充了公开背景。",
+      },
+    ]);
+    expect(next.selectedDraftVersionId).toBe("draft-1-materials-result");
+  });
+
+  it("replaces the previous formatted version and selects the latest one", () => {
+    const state = {
+      ...createInitialWorkflowState(),
+      draftVersions: [
+        { id: "draft-1", label: "原始版", content: "原正文。" },
+        { id: "draft-old-format", label: "排版版", content: "旧排版。" },
+      ],
+      selectedDraftVersionId: "draft-1",
+    };
+
+    const next = transitionWorkflow(state, {
+      type: "draft_formatted",
+      draft: {
+        id: "draft-new-format",
+        label: "排版版",
+        content: "## 新排版\n\n原正文。",
+      },
+    });
+
+    expect(next.draftVersions).toEqual([
+      state.draftVersions[0],
+      {
+        id: "draft-new-format",
+        label: "排版版",
+        content: "## 新排版\n\n原正文。",
+      },
+    ]);
+    expect(next.selectedDraftVersionId).toBe("draft-new-format");
+  });
+
+  it("updates one Markdown draft without changing the other versions", () => {
+    const state: WorkflowState = {
+      ...createInitialWorkflowState(),
+      draftVersions: [
+        { id: "draft-1", label: "原始版", content: "旧正文" },
+        { id: "draft-2", label: "原始版", content: "另一版" },
+      ],
+      selectedDraftVersionId: "draft-1",
+    };
+
+    const next = transitionWorkflow(state, {
+      type: "draft_updated",
+      draftVersionId: "draft-1",
+      content: "## 新标题\n\n新正文",
+    });
+
+    expect(next.draftVersions[0]?.content).toBe("## 新标题\n\n新正文");
+    expect(next.draftVersions[1]?.content).toBe("另一版");
   });
 
   it("keeps enriched topic search context after draft versions are generated", () => {

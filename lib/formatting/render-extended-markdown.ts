@@ -1,9 +1,20 @@
-import { parseAdvancedMarkdown } from "@/lib/markdown/advanced-modules";
+import {
+  advancedModuleToMarkdown,
+  parseAdvancedMarkdown,
+  validateAdvancedModuleNode,
+} from "@/lib/markdown/advanced-modules";
 import { renderSafeGfm, type GfmTagStyleMap } from "@/lib/markdown/render";
 import { renderAdvancedModule } from "./advanced-module-render";
-import { WECHAT_NATIVE_TOKENS as T } from "./wechat-native-tokens";
+import {
+  WECHAT_NATIVE_TOKENS as DEFAULT_TOKENS,
+  getFormatTokens,
+  setFormatTokens,
+  resetFormatTokens,
+  type FormatTokens,
+} from "./format-tokens";
 
-const markdownStyles: GfmTagStyleMap = {
+function markdownStyles(T: FormatTokens): GfmTagStyleMap {
+  return {
   h1: `margin:32px 0 18px;color:${T.colors.text};font-family:${T.font};font-size:30px;line-height:1.35;font-weight:900;`,
   h2: `margin:30px 0 16px;padding-left:12px;border-left:4px solid ${T.colors.accent};color:${T.colors.text};font-family:${T.font};font-size:24px;line-height:1.4;font-weight:850;`,
   h3: `margin:26px 0 14px;color:${T.colors.accentStrong};font-family:${T.font};font-size:20px;line-height:1.45;font-weight:800;`,
@@ -23,7 +34,23 @@ const markdownStyles: GfmTagStyleMap = {
   td: `padding:10px;border:1px solid ${T.colors.border};color:${T.colors.text};vertical-align:top;`,
   code: `padding:2px 5px;border-radius:4px;background:${T.colors.accentSoft};color:${T.colors.accentStrong};font-size:0.9em;`,
   pre: `margin:20px 0;padding:16px;border-radius:${T.radius.medium};background:#17221d;color:#eef7f2;overflow-x:auto;line-height:1.65;`,
-};
+  };
+}
+
+const PLACEHOLDER_PATTERN = /【💡需要你补充：([^】]+)】/g;
+
+function escapeHtml(value = "") {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function materialPlaceholderWarning(detail: string) {
+  return `<section data-material-placeholder="required" style="margin:22px 0;padding:18px 18px;border:2px solid #f43f5e;border-radius:14px;background:#fff1f2;color:#881337;font-family:${getFormatTokens().font};box-shadow:0 0 0 4px rgba(244,63,94,0.10);"><p style="margin:0 0 8px;font-size:13px;font-weight:900;letter-spacing:0.08em;color:#be123c;">必须补充真实素材</p><p style="margin:0;color:#881337;font-size:15px;line-height:1.8;font-weight:700;">需要你补充：${escapeHtml(detail.trim())}</p><p style="margin:10px 0 0;color:#9f1239;font-size:12px;line-height:1.65;">这不是正文内容。补完真实经历、场景或证据后再复制发布。</p></section>`;
+}
 
 function extractGlobalFootnoteDefinitions(markdown: string) {
   const definitions: string[] = [];
@@ -51,27 +78,59 @@ function detachFootnotes(html: string, collected: Map<string, string>) {
   );
 }
 
-export function renderExtendedMarkdown(markdown: string) {
+export function renderExtendedMarkdown(markdown: string, tokens?: FormatTokens) {
+  const T = tokens ?? DEFAULT_TOKENS;
+  setFormatTokens(T);
   const footnotes = extractGlobalFootnoteDefinitions(markdown);
   const collectedFootnotes = new Map<string, string>();
+  const renderMarkdownSegment = (segment: string, includeDefinitions: boolean) =>
+    detachFootnotes(
+      renderSafeGfm(
+        includeDefinitions && footnotes.definitions
+          ? `${segment}\n\n${footnotes.definitions}`
+          : segment,
+        { tagStyles: markdownStyles(T) }
+      ),
+      collectedFootnotes
+    );
+  const renderMarkdownNode = (nodeContent: string) => {
+    let cursor = 0;
+    let usedDefinitions = false;
+    const parts: string[] = [];
+
+    for (const match of nodeContent.matchAll(PLACEHOLDER_PATTERN)) {
+      const index = match.index ?? 0;
+      const before = nodeContent.slice(cursor, index);
+      if (before.trim()) {
+        parts.push(renderMarkdownSegment(before, !usedDefinitions));
+        usedDefinitions = true;
+      }
+      parts.push(materialPlaceholderWarning(match[1] ?? ""));
+      cursor = index + match[0].length;
+    }
+
+    const after = nodeContent.slice(cursor);
+    if (after.trim() || parts.length === 0) {
+      parts.push(renderMarkdownSegment(after, !usedDefinitions));
+    }
+
+    return parts.join("");
+  };
   const content = parseAdvancedMarkdown(footnotes.content)
-    .map((node) =>
-      node.type === "module"
+    .map((node) => {
+      if (node.type !== "module") return renderMarkdownNode(node.content);
+      const validation = validateAdvancedModuleNode(node);
+      return validation.ok
         ? renderAdvancedModule(node)
-        : detachFootnotes(
-            renderSafeGfm(
-              footnotes.definitions
-                ? `${node.content}\n\n${footnotes.definitions}`
-                : node.content,
-              { tagStyles: markdownStyles }
-            ),
-            collectedFootnotes
-          )
-    )
+        : renderMarkdownNode(advancedModuleToMarkdown(node));
+    })
     .join("");
   const footnoteHtml = collectedFootnotes.size
     ? `<section class="footnotes" style="margin-top:32px;padding-top:12px;border-top:1px solid ${T.colors.border};font-family:${T.font};color:${T.colors.muted};font-size:13px;"><ol style="margin:0;padding-left:22px;">${[...collectedFootnotes.values()].join("")}</ol></section>`
     : "";
 
-  return `<article data-wechat-theme="wechat-native" style="width:100%;max-width:680px;margin:0 auto;padding:12px 16px 36px;box-sizing:border-box;background:${T.colors.surface};color:${T.colors.text};font-family:${T.font};word-break:break-word;overflow-wrap:anywhere;">${content}${footnoteHtml}</article>`;
+  const themeId: string = tokens === undefined ? "wechat-native" : "claude";
+  const article = `<article data-wechat-theme="${themeId}" style="width:100%;max-width:680px;margin:0 auto;padding:12px 16px 36px;box-sizing:border-box;background:${T.colors.surface};color:${T.colors.text};font-family:${T.font};word-break:break-word;overflow-wrap:anywhere;">${content}${footnoteHtml}</article>`;
+  resetFormatTokens();
+  return article;
 }

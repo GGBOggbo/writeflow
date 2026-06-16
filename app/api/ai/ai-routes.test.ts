@@ -5,7 +5,9 @@ import { streamJsonResponse } from "./_stream";
 import { getLogContext } from "@/lib/logging/context";
 import { POST as postTopics } from "./topics/route";
 import { POST as postTopicsStream } from "./topics/stream/route";
-import { POST as postHumanize } from "./humanize/route";
+import { POST as postCompleteMaterialsStream } from "./complete-materials/stream/route";
+import { POST as postFormatDraftStream } from "./format-draft/stream/route";
+import { POST as postDraft } from "./draft/route";
 
 const creditMocks = vi.hoisted(() => ({
   reserve: vi.fn(),
@@ -170,34 +172,162 @@ describe("AI routes", () => {
     expect(response.headers.get("X-Request-Id")).toMatch(/[0-9a-f-]{36}/);
   });
 
-  it("charges a separate humanize credit after draft delivery", async () => {
-    const request = new Request("http://localhost:3000/api/ai/humanize", {
+
+  it("charges only one credit for draft generation with internal Markdown formatting", async () => {
+    vi.spyOn(aiService, "generateDraft").mockResolvedValueOnce({
+      drafts: [
+        {
+          id: "draft-1",
+          label: "原始版",
+          content: "## 真正的问题\n\n正文内容。",
+        },
+      ],
+    });
+    const request = new Request("http://localhost:3000/api/ai/draft", {
       method: "POST",
       body: JSON.stringify({
         operationId,
-        draft: { id: "draft-1", label: "原始版", content: "原始正文。" },
-        coreViewpoint: "先验证再优化。",
+        topicId: "topic-1",
+        topicLabel: "工程推进",
+        topicAngle: "先验证主流程",
+        coreViewpoint: "先跑通主流程，再优化模型。",
+        targetAudience: "产品经理",
+        reason: "这个顺序更稳。",
+        structureType: "痛点拆解型",
+        briefObjective: "讲清工程顺序。",
+        briefAudience: "产品经理",
         briefPersona: "实战派负责人",
-        briefTone: "务实",
-        briefDropOffPoint: "让读者先行动。",
+        briefTone: "清晰、务实",
+        briefDropOffPoint: "让读者先验证主流程。",
+        briefConstraints: ["避免空话"],
+        outline: [
+          {
+            id: "section-1",
+            heading: "为什么先跑通主流程",
+            corePoint: "先验证用户路径。",
+            supportSuggestion: "补充真实场景。",
+            sectionRole: "痛点引入",
+          },
+        ],
+        materialSlots: [],
       }),
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-workflow-id": workflowId,
+      },
     });
 
-    const response = await postHumanize(request);
-    const json = await response.json();
+    const response = await postDraft(request);
 
     expect(response.status).toBe(200);
-    expect(json.draft.label).toBe("去 AI 版");
     expect(creditMocks.reserve).toHaveBeenCalledWith(
       "test-user",
-      "humanize",
+      "draft",
       operationId
     );
-    expect(creditMocks.consume).toHaveBeenCalledWith(
-      "test-user",
-      operationId
+    expect(creditMocks.consume).toHaveBeenCalledWith("test-user", operationId);
+    expect(creditMocks.reserve).toHaveBeenCalledTimes(1);
+    expect(creditMocks.consume).toHaveBeenCalledTimes(1);
+  });
+
+  it("completes draft materials without reserving or consuming credits", async () => {
+    vi.spyOn(aiService, "completeDraftMaterials").mockResolvedValueOnce({
+      draft: {
+        id: "draft-1-materials-result",
+        label: "AI 补充版",
+        content: "开头。这里是一段资料支持的补充。结尾。",
+      },
+    });
+    const request = new Request(
+      "http://localhost:3000/api/ai/complete-materials/stream",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          operationId,
+          draft: {
+            id: "draft-1",
+            label: "原始版",
+            content: "开头。【💡需要你补充：公开背景】结尾。",
+          },
+          topicLabel: "AI 产品",
+          topicAngle: "工程顺序",
+          coreViewpoint: "先验证流程。",
+          briefObjective: "解释取舍。",
+          briefAudience: "产品经理",
+          briefPersona: "务实负责人",
+          outline: [
+            {
+              id: "section-1",
+              heading: "先验证流程",
+              corePoint: "验证路径。",
+              supportSuggestion: "补充背景。",
+              sectionRole: "核心拆解",
+            },
+          ],
+          searchContext: null,
+        }),
+        headers: {
+          "content-type": "application/json",
+          "x-workflow-id": workflowId,
+        },
+      }
     );
+
+    const response = await postCompleteMaterialsStream(request);
+    const payloads = (await response.text())
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+
+    expect(response.status).toBe(200);
+    expect(payloads.some((payload) => payload.type === "credits")).toBe(false);
+    expect(payloads[payloads.length - 1]).toMatchObject({
+      type: "result",
+      data: { draft: { label: "AI 补充版" } },
+    });
+    expect(creditMocks.reserve).not.toHaveBeenCalled();
+    expect(creditMocks.consume).not.toHaveBeenCalled();
+    expect(creditMocks.refund).not.toHaveBeenCalled();
+  });
+
+  it("formats a draft without reserving or consuming credits", async () => {
+    vi.spyOn(aiService, "formatDraft").mockResolvedValueOnce({
+      draft: {
+        id: "draft-1-formatted",
+        label: "排版版",
+        content: "## 小标题\n\n正文。",
+      },
+    });
+    const request = new Request(
+      "http://localhost:3000/api/ai/format-draft/stream",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          operationId,
+          draft: { id: "draft-1", label: "原始版", content: "正文。" },
+        }),
+        headers: {
+          "content-type": "application/json",
+          "x-workflow-id": workflowId,
+        },
+      }
+    );
+
+    const response = await postFormatDraftStream(request);
+    const payloads = (await response.text())
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+
+    expect(response.status).toBe(200);
+    expect(payloads.some((payload) => payload.type === "credits")).toBe(false);
+    expect(payloads.at(-1)).toMatchObject({
+      type: "result",
+      data: { draft: { label: "排版版" } },
+    });
+    expect(creditMocks.reserve).not.toHaveBeenCalled();
+    expect(creditMocks.consume).not.toHaveBeenCalled();
+    expect(creditMocks.refund).not.toHaveBeenCalled();
   });
 
   it("refunds the reserved credit when JSON generation fails", async () => {

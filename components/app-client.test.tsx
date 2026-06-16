@@ -502,7 +502,7 @@ describe("AppClient", () => {
     ).not.toHaveLength(0);
   });
 
-  it("keeps the original draft when the separate humanization action fails", async () => {
+  it("keeps the original draft when free AI Markdown formatting fails", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       "ai-writing-mvp-workflow",
@@ -580,7 +580,7 @@ describe("AppClient", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          error: "humanizer unavailable",
+          error: "markdown formatter unavailable",
         }),
         {
           status: 500,
@@ -592,18 +592,18 @@ describe("AppClient", () => {
     render(<AppClient />);
 
     await user.click(
-      await screen.findByRole("button", { name: "去 AI 味，消耗 1 积分" })
+      await screen.findByRole("button", { name: "AI 编辑排版（免费）" })
     );
 
     expect(
-      await screen.findByText("这是安全保留下来的原始正文。")
-    ).toBeInTheDocument();
+      await screen.findByRole("textbox", { name: "Markdown 正文" })
+    ).toHaveValue("这是安全保留下来的原始正文。");
     expect(
-      await screen.findAllByText("humanizer unavailable")
+      await screen.findAllByText("markdown formatter unavailable")
     ).not.toHaveLength(0);
   });
 
-  it("lets the user humanize a delivered draft as a separate paid action", async () => {
+  it("lets the user create a free AI material completion draft", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
       "ai-writing-mvp-workflow",
@@ -637,27 +637,20 @@ describe("AppClient", () => {
             id: "section-1",
             heading: "为什么先验证",
             corePoint: "先验证主流程",
-            supportSuggestion: "补一个真实片段",
+            supportSuggestion: "补充公开背景",
             sectionRole: "正文模块",
           },
         ],
-        materialSlots: [
-          {
-            id: "slot-1",
-            targetOutlineId: "section-1",
-            label: "案例证据",
-            content: "补一个真实片段",
-            purpose: "增强真实感",
-          },
-        ],
+        materialSlots: [],
         draftVersions: [
           {
             id: "draft-1",
             label: "原始版",
-            content: "直接生成的原始正文。",
+            content: "开头。【💡需要你补充：补充公开背景】结尾。",
           },
         ],
         selectedDraftVersionId: "draft-1",
+        topicSearchContext: null,
       })
     );
 
@@ -665,29 +658,62 @@ describe("AppClient", () => {
       new Response(
         JSON.stringify({
           draft: {
-            id: "draft-1-humanized",
-            label: "去 AI 版",
-            content: "这是去掉 AI 味后的正文。",
+            id: "draft-1-materials-result",
+            label: "AI 补充版",
+            content: "开头。这里补充了公开背景。结尾。",
           },
         }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
+        { status: 200, headers: { "Content-Type": "application/json" } }
       )
     );
 
     render(<AppClient />);
-
     await user.click(
-      await screen.findByRole("button", { name: "去 AI 味，消耗 1 积分" })
+      await screen.findByRole("button", { name: "AI 补充素材（免费）" })
     );
 
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      "/api/ai/complete-materials/stream"
+    );
     const requestBody = JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body));
-    expect(fetchSpy.mock.calls[0]?.[0]).toBe("/api/ai/humanize/stream");
-    expect(requestBody.draft.content).toBe("直接生成的原始正文。");
-    expect(await screen.findByText("去 AI 版")).toBeInTheDocument();
-    expect(await screen.findByText("这是去掉 AI 味后的正文。")).toBeInTheDocument();
+    expect(requestBody.draft.id).toBe("draft-1");
+    expect(requestBody.topicLabel).toBe("工程推进");
+    expect(await screen.findByText("AI 补充版")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("textbox", { name: "Markdown 正文" })
+    ).toHaveValue("开头。这里补充了公开背景。结尾。");
+  });
+
+  it("renders Markdown with the local WeChat preview without another request", async () => {
+    window.localStorage.setItem(
+      "ai-writing-mvp-workflow",
+      JSON.stringify({
+        currentStep: "draft_review",
+        draftVersions: [
+          {
+            id: "draft-1",
+            label: "原始版",
+            content: "## 本地标题\n\n**重点正文**",
+          },
+        ],
+        selectedDraftVersionId: "draft-1",
+      })
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    render(<AppClient />);
+
+    const preview = await screen.findByLabelText("公众号排版预览");
+    expect(preview.innerHTML).toContain("本地标题");
+    expect(preview.innerHTML).toContain("<strong");
+    expect(preview).toHaveAttribute(
+      "data-theme",
+      "wechat-native"
+    );
+    expect(
+      screen.queryByRole("button", { name: /公众号排版/ })
+    ).not.toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("asks for confirmation before resetting the workflow", async () => {

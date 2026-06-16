@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowState } from "@/types/workflow";
 import { WorkflowProvider } from "../workflow-context";
@@ -180,6 +181,8 @@ describe("search toggle placement", () => {
       currentStep: "meta_review",
       titleOptions: [{ id: "t1", label: "利益结果型", content: "标题" }],
       summaryOptions: [{ id: "s1", label: "痛点共鸣版", content: "摘要" }],
+      coverSuggestion: "优先使用真实后台截图。",
+      coverImagePrompt: "【公众号封面 · 900×383】\n画面概念：真实工作台",
       finalSelection: {
         draftVersionId: null,
         titleId: "t1",
@@ -189,5 +192,30 @@ describe("search toggle placement", () => {
 
     expect(await screen.findByText("包装定案：标题、摘要与封面表达")).toBeInTheDocument();
     expect(screen.queryByText("复用选题参考")).not.toBeInTheDocument();
+  });
+
+  it("reveals the AI cover prompt on demand in the meta stage", async () => {
+    const user = userEvent.setup();
+    renderWithState(<MetaStage />, {
+      currentStep: "meta_review",
+      titleOptions: [{ id: "t1", label: "利益结果型", content: "标题" }],
+      summaryOptions: [{ id: "s1", label: "痛点共鸣版", content: "摘要" }],
+      coverSuggestion: "优先使用真实后台截图。",
+      coverImagePrompt: "【公众号封面 · 900×383】\n画面概念：真实工作台",
+      finalSelection: {
+        draftVersionId: null,
+        titleId: "t1",
+        summaryId: "s1",
+      },
+    });
+
+    expect(await screen.findByText("优先使用真实后台截图。")).toBeInTheDocument();
+    expect(screen.queryByText(/画面概念：真实工作台/)).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "生成 AI 封面提示词" })
+    );
+
+    expect(screen.getByText(/画面概念：真实工作台/)).toBeInTheDocument();
   });
 });

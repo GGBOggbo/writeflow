@@ -1,7 +1,6 @@
 import type {
   Brief,
   DraftVersion,
-  FormattingBlock,
   MaterialSlot,
   MetaCard,
   OutlineSection,
@@ -95,38 +94,32 @@ export type GenerateDraftOutput = {
   searchContext?: SearchReferenceBundle;
 };
 
-export type HumanizeDraftInput = {
-  draft: DraftVersion;
-  coreViewpoint: string;
-  briefPersona: string;
-  briefTone: string;
-  briefDropOffPoint: string;
-};
-
-export type HumanizeDraftOutput = {
-  draft: DraftVersion;
-};
-
-export type HumanizeDraftsInput = {
-  drafts: DraftVersion[];
-  coreViewpoint: string;
-  briefPersona: string;
-  briefTone: string;
-  briefDropOffPoint: string;
-};
-
-export type HumanizeDraftsOutput = {
-  drafts: DraftVersion[];
-};
-
 export type FormatDraftInput = {
-  draftVersionId: string;
-  content: string;
+  draft: DraftVersion;
 };
 
 export type FormatDraftOutput = {
-  draftVersionId: string;
-  blocks: FormattingBlock[];
+  draft: DraftVersion;
+};
+
+export type CompleteDraftMaterialsInput = {
+  draft: DraftVersion;
+  topicLabel: string;
+  topicAngle: string;
+  coreViewpoint: string;
+  briefObjective: string;
+  briefAudience: string;
+  briefPersona: string;
+  outline: OutlineSection[];
+  searchContext?: SearchReferenceBundle | null;
+};
+
+export type CompleteDraftMaterialsOutput = {
+  draft: DraftVersion;
+};
+
+export type CompleteDraftMaterialsProviderOutput = {
+  drafts: DraftVersion[];
 };
 
 export type CoverImageConcept = {

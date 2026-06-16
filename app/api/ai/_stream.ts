@@ -203,3 +203,87 @@ export async function streamJsonResponse<
     );
   });
 }
+
+export async function authenticatedStreamJsonResponse<
+  TInput extends MeteredInput,
+  TOutput,
+>(
+  request: Request,
+  schema: ZodType<TInput>,
+  stage: AiStage,
+  handler: (
+    input: TInput,
+    emit: (event: WorkflowProgressEvent) => void
+  ) => Promise<TOutput>
+) {
+  return withRequestLogContext(request, async () => {
+    const startedAt = Date.now();
+    let input: TInput;
+
+    try {
+      input = schema.parse(await request.json());
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "请求参数不合法" },
+        { status: 400, headers: logResponseHeaders() }
+      );
+    }
+
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "请先登录后再使用。" },
+        { status: 401, headers: logResponseHeaders() }
+      );
+    }
+
+    return runWithExtendedLogContext(
+      {
+        operationId: input.operationId,
+        stage,
+        userIdHash: await hashUserId(session.user.id),
+      },
+      async () => {
+        const encoder = new TextEncoder();
+        const streamContext = getLogContext();
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const run = async () => {
+              try {
+                const result = await handler(input, (event) => {
+                  write(controller, encoder, { type: "progress", event });
+                });
+                write(controller, encoder, { type: "result", data: result });
+                log.info("api", "free stream completed", {
+                  event: "api.free_stream.completed",
+                  status: "succeeded",
+                  durationMs: Date.now() - startedAt,
+                });
+              } catch (error) {
+                log.error("api", "free stream failed", error);
+                write(controller, encoder, {
+                  type: "error",
+                  error: error instanceof Error ? error.message : "服务生成失败",
+                });
+              } finally {
+                controller.close();
+              }
+            };
+
+            return streamContext
+              ? runWithLogContext(streamContext, run)
+              : run();
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            ...logResponseHeaders(),
+            "Content-Type": "application/x-ndjson; charset=utf-8",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      }
+    );
+  });
+}

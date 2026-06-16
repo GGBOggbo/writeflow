@@ -163,6 +163,60 @@ export async function meteredJsonResponse<TInput extends MeteredInput, TOutput>(
   });
 }
 
+export async function authenticatedJsonResponse<
+  TInput extends MeteredInput,
+  TOutput,
+>(
+  request: Request,
+  schema: ZodType<TInput>,
+  stage: AiStage,
+  handler: (input: TInput) => Promise<TOutput>
+) {
+  return withRequestLogContext(request, async () => {
+    const startedAt = Date.now();
+    let input: TInput;
+
+    try {
+      input = schema.parse(await request.json());
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "请求参数不合法" },
+        { status: 400, headers: logResponseHeaders() }
+      );
+    }
+
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "请先登录后再使用。" },
+        { status: 401, headers: logResponseHeaders() }
+      );
+    }
+
+    return runWithExtendedLogContext(
+      {
+        operationId: input.operationId,
+        stage,
+        userIdHash: await hashUserId(session.user.id),
+      },
+      async () => {
+        try {
+          const result = await handler(input);
+          log.info("api", "free request completed", {
+            event: "api.free_request.completed",
+            status: "succeeded",
+            durationMs: Date.now() - startedAt,
+          });
+          return NextResponse.json(result, { headers: logResponseHeaders() });
+        } catch (error) {
+          log.error("api", "free request failed", error);
+          return serverErrorResponse(error);
+        }
+      }
+    );
+  });
+}
+
 export function serverErrorResponse(error: unknown) {
   return NextResponse.json(
     {

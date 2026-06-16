@@ -496,28 +496,29 @@ describe("wxrank search provider", () => {
     }
   });
 
-  it("deep-dives exactly two selected articles with html and comments", async () => {
+  it("deep-dives exactly eight selected articles with html and comments", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
     const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
       history: [Array.from({ length: 8 }, (_, index) => article(index + 1))],
-      articleInfo: [
-        articleInfo(1, {
-          article_url: "https://mp.weixin.qq.com/s/canonical-one",
-          comment_id: "comment-one",
-        }),
-        articleInfo(2, {
-          article_url: "https://mp.weixin.qq.com/s/canonical-two",
-          comment_id: "comment-two",
-        }),
-      ],
+      articleInfo: Array.from({ length: 8 }, (_, index) =>
+        articleInfo(index + 1, {
+          article_url: `https://mp.weixin.qq.com/s/canonical-${index + 1}`,
+          comment_id: `comment-${index + 1}`,
+        })
+      ),
       comments: [
         [
           comment(1, { content: "<p>普通评论</p>", like_num: 500 }),
           comment(2, { content: "置顶评论", like_num: 1, is_top: 1 }),
           comment(3, { content: "高赞评论", like_num: 900 }),
         ],
-        [comment(4, { content: "第二篇评论", like_num: 300 })],
+        ...Array.from({ length: 7 }, (_, index) => [
+          comment(index + 4, {
+            content: `第${index + 2}篇评论`,
+            like_num: 300 - index,
+          }),
+        ]),
       ],
     });
     const progress: WorkflowProgressEvent[] = [];
@@ -526,29 +527,25 @@ describe("wxrank search provider", () => {
       progress.push(event)
     );
 
-    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(2);
-    expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(2);
-    expect(results.filter((result) => result.articleHtml)).toHaveLength(2);
-    expect(results.filter((result) => result.comments?.length)).toHaveLength(2);
-    expect(results.some((result) => result.url === "https://mp.weixin.qq.com/s/canonical-one"))
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(8);
+    expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(8);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(8);
+    expect(results.filter((result) => result.comments?.length)).toHaveLength(8);
+    expect(results.some((result) => result.url === "https://mp.weixin.qq.com/s/canonical-1"))
       .toBe(true);
-    expect(results.find((result) => result.url === "https://mp.weixin.qq.com/s/canonical-one")
+    expect(results.find((result) => result.url === "https://mp.weixin.qq.com/s/canonical-1")
       ?.comments?.map((item) => item.content)).toEqual([
         "置顶评论",
         "高赞评论",
         "普通评论",
       ]);
     expect(calls.filter((call) => call.endpoint === "getcm").map((call) => call.input))
-      .toEqual([
-        {
-          url: "https://mp.weixin.qq.com/s/canonical-one",
-          commentId: "comment-one",
-        },
-        {
-          url: "https://mp.weixin.qq.com/s/canonical-two",
-          commentId: "comment-two",
-        },
-      ]);
+      .toEqual(
+        Array.from({ length: 8 }, (_, index) => ({
+          url: `https://mp.weixin.qq.com/s/canonical-${index + 1}`,
+          commentId: `comment-${index + 1}`,
+        }))
+      );
     expect(progress.map((event) => event.stepId)).toContain("deep_dive_started");
     expect(progress.map((event) => event.stepId)).toContain("deep_dive_completed");
     const logs = capture.output();
@@ -568,18 +565,17 @@ describe("wxrank search provider", () => {
     vi.stubEnv("LOG_LEVEL", "debug");
     const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
-      history: [Array.from({ length: 5 }, (_, index) => article(index + 1))],
-      articleInfo: [
-        articleInfo(1, { comment_id: undefined }),
-        articleInfo(2, { comment_id: undefined }),
-      ],
+      history: [Array.from({ length: 8 }, (_, index) => article(index + 1))],
+      articleInfo: Array.from({ length: 8 }, (_, index) =>
+        articleInfo(index + 1, { comment_id: undefined })
+      ),
     });
 
     const results = await createProvider(client).search(baseInput());
 
-    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(2);
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(8);
     expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(0);
-    expect(results.filter((result) => result.articleHtml)).toHaveLength(2);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(8);
     const logs = capture.output();
     capture.restore();
     expect(logs).toContain('"event":"search.comments.skipped"');
@@ -594,6 +590,9 @@ describe("wxrank search provider", () => {
       articleInfo: [
         new Error("artinfo failed"),
         articleInfo(2, { comment_id: "comment-two" }),
+        ...Array.from({ length: 6 }, (_, index) =>
+          articleInfo(index + 3, { comment_id: undefined })
+        ),
       ],
       comments: [new Error("getcm failed")],
     });
@@ -601,9 +600,9 @@ describe("wxrank search provider", () => {
     const results = await createProvider(client).search(baseInput());
 
     expect(results).toHaveLength(8);
-    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(2);
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(8);
     expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(1);
-    expect(results.filter((result) => result.articleHtml)).toHaveLength(1);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(7);
     expect(results.filter((result) => result.comments?.length)).toHaveLength(0);
     expect(results.map((result) => result.title)).toContain("Claude 神话模型实测 1");
     const warnings = capture.output();
