@@ -21,7 +21,7 @@ function markdownStyles(T: FormatTokens): GfmTagStyleMap {
   h4: `margin:22px 0 12px;color:${T.colors.text};font-family:${T.font};font-size:18px;line-height:1.5;font-weight:800;`,
   h5: `margin:20px 0 10px;color:${T.colors.text};font-family:${T.font};font-size:16px;line-height:1.55;font-weight:800;`,
   h6: `margin:18px 0 10px;color:${T.colors.muted};font-family:${T.font};font-size:14px;line-height:1.55;font-weight:800;`,
-  p: `margin:14px 0;color:${T.colors.text};font-family:${T.font};font-size:16px;line-height:1.9;letter-spacing:0.01em;`,
+  p: `margin:14px 0;color:${T.colors.text};font-family:${T.font};font-size:16px;line-height:1.6;text-align:justify;letter-spacing:0.01em;`,
   blockquote: `margin:22px 0;padding:16px 18px;border-left:4px solid ${T.colors.accent};border-radius:${T.radius.small};background:${T.colors.accentSoft};color:${T.colors.accentStrong};font-family:${T.font};`,
   ul: `margin:16px 0;padding-left:24px;color:${T.colors.text};font-family:${T.font};`,
   ol: `margin:16px 0;padding-left:24px;color:${T.colors.text};font-family:${T.font};`,
@@ -130,7 +130,7 @@ export function renderExtendedMarkdown(markdown: string, tokens?: FormatTokens) 
     : "";
 
   const themeId: string = tokens === undefined ? "writeflow-editorial" : "custom";
-  const article = `<article data-wechat-theme="${themeId}" style="width:100%;max-width:680px;margin:0 auto;padding:12px 16px 36px;box-sizing:border-box;background:${T.colors.surface};color:${T.colors.text};font-family:${T.font};word-break:break-word;overflow-wrap:anywhere;">${content}${footnoteHtml}</article>`;
+  const article = `<article data-wechat-theme="${themeId}" style="width:100%;max-width:680px;margin:0 auto;padding:12px 26px 36px;box-sizing:border-box;background:${T.colors.surface};color:${T.colors.text};font-family:${T.font};word-break:break-word;overflow-wrap:anywhere;">${content}${footnoteHtml}</article>`;
   resetFormatTokens();
   return article;
 }
