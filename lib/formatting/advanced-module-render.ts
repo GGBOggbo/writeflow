@@ -1,5 +1,7 @@
 import type { AdvancedModuleNode } from "@/lib/markdown/advanced-modules";
+import { isWriteflowModuleName } from "@/lib/markdown/module-defs";
 import { getFormatTokens, type FormatTokens } from "./format-tokens";
+import { renderWriteflowModule } from "./writeflow-module-render";
 
 let T: FormatTokens = getFormatTokens();
 
@@ -389,7 +391,9 @@ function renderCta(node: AdvancedModuleNode) {
   );
 }
 
-const RENDERERS: Record<AdvancedModuleNode["name"], (node: AdvancedModuleNode) => string> = {
+const RENDERERS: Partial<
+  Record<AdvancedModuleNode["name"], (node: AdvancedModuleNode) => string>
+> = {
   hero: renderHero,
   cards: renderCards,
   metrics: renderMetrics,
@@ -425,5 +429,10 @@ const RENDERERS: Record<AdvancedModuleNode["name"], (node: AdvancedModuleNode) =
 
 export function renderAdvancedModule(node: AdvancedModuleNode) {
   T = getFormatTokens();
-  return RENDERERS[node.name](node);
+  if (isWriteflowModuleName(node.name)) {
+    return renderWriteflowModule(node);
+  }
+
+  const renderer = RENDERERS[node.name];
+  return renderer ? renderer(node) : "";
 }

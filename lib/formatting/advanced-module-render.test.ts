@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  ADVANCED_MODULE_NAMES,
   parseAdvancedMarkdown,
-  type AdvancedModuleName,
   type AdvancedModuleNode,
 } from "@/lib/markdown/advanced-modules";
+import { LEGACY_ADVANCED_MODULE_NAMES } from "@/lib/markdown/module-defs";
 import { renderAdvancedModule } from "./advanced-module-render";
 
 const MODULE_SAMPLES: Record<
-  AdvancedModuleName,
+  (typeof LEGACY_ADVANCED_MODULE_NAMES)[number],
   { markdown: string; expected: string }
 > = {
   hero: {
@@ -248,8 +247,8 @@ function parseModule(markdown: string): AdvancedModuleNode {
 }
 
 describe("renderAdvancedModule", () => {
-  it.each(ADVANCED_MODULE_NAMES)(
-    "renders the %s module with its own action id and visible content",
+  it.each(LEGACY_ADVANCED_MODULE_NAMES)(
+    "renders the legacy %s module with its own action id and visible content",
     (name) => {
       const sample = MODULE_SAMPLES[name];
       const html = renderAdvancedModule(parseModule(sample.markdown));
@@ -260,6 +259,35 @@ describe("renderAdvancedModule", () => {
       expect(html).not.toContain(":::");
     }
   );
+
+  it("renders wf modules with Writeflow-owned attributes and no copied mpa ids", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-pullquote
+quote: 先验证用户路径，再考虑模型配置。
+source: 原文
+:::`)
+    );
+
+    expect(html).toContain('data-writeflow-module="wf-pullquote"');
+    expect(html).toContain("先验证用户路径");
+    expect(html).not.toContain("data-mpa-action-id");
+    expect(html).not.toContain("grid-template-columns");
+    expect(html).not.toContain("linear-gradient");
+  });
+
+  it("renders wf-points and wf-steps as readable stacked mobile blocks", () => {
+    const points = renderAdvancedModule(
+      parseModule(`:::wf-points
+01 | 先确认主流程 | 不急着堆功能。
+02 | 再确认复制效果 | 公众号后台不塌才算完成。
+:::`)
+    );
+
+    expect(points).toContain('data-writeflow-module="wf-points"');
+    expect(points).toContain("先确认主流程");
+    expect(points).toContain("公众号后台不塌");
+    expect(points).not.toContain("display:grid");
+  });
 
   it("uses the shared wechat-native visual contract", () => {
     const html = renderAdvancedModule(parseModule(MODULE_SAMPLES.hero.markdown));
