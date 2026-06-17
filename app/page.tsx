@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { AppClient } from "@/components/app-client";
+import { LandingPage } from "@/components/landing-page";
 import { auth } from "@/lib/auth";
 import { safeGetSession } from "@/lib/auth-session";
 import { creditStore } from "@/lib/credits";
@@ -9,14 +10,17 @@ export default async function Home() {
     headers: await headers(),
     getSession: auth.api.getSession,
   });
-  const initialCreditBalance = session?.user
-    ? await creditStore.getBalance(session.user.id)
-    : null;
+
+  if (!session?.user) {
+    return <LandingPage />;
+  }
+
+  const initialCreditBalance = await creditStore.getBalance(session.user.id);
 
   return (
     <AppClient
       initialCreditBalance={initialCreditBalance}
-      currentUserId={session?.user?.id ?? null}
+      currentUserId={session.user.id}
     />
   );
 }

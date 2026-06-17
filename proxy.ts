@@ -22,11 +22,12 @@ export const config = {
   matcher: [
     /*
      * 保护除了以下路径之外的所有页面：
+     * - / (首页落地页，未登录可看)
      * - /login (登录页)
      * - /api (API 路由)
      * - /_next (Next.js 内部资源)
      * - 静态资源
      */
-    "/((?!login|reset-password|api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!$|login|reset-password|api|_next/static|_next/image|favicon.ico).*)",
   ],
 };
