@@ -131,6 +131,53 @@ Code should not inject `hero`, `verdict`, `cta`, or summary modules after the AI
 returns. It should render what exists, validate what exists, and fail safely
 when unsupported module syntax appears.
 
+## Module Syntax Boundary
+
+The formatter supports module syntax only as compatibility syntax.
+
+Existing advanced modules keep their current fence form:
+
+```md
+:::module-name
+field: value
+:::
+```
+
+The exact supported module names, fields, and validation rules should continue
+to come from the existing module definitions in code. This spec does not create
+a second module source of truth.
+
+Formatting-only output should not introduce new module fences. In particular,
+the formatter should not generate new rhythm DSL blocks such as:
+
+```md
+::opening
+...
+::
+
+::section
+...
+::
+```
+
+For new formatted output, the preferred structure is ordinary Markdown:
+
+```md
+**文章标题**
+
+01
+
+**小标题**
+
+正文段落。
+
+**已有重点句。**
+```
+
+If the source already contains a valid advanced module, render it. If the source
+contains an invalid or unsupported module, degrade it safely. If the source
+contains no module, do not add one.
+
 ## Prompt Boundary
 
 If an AI formatting prompt is used, it must be framed as a typesetting task:
@@ -144,6 +191,7 @@ If an AI formatting prompt is used, it must be framed as a typesetting task:
 7. Do not rewrite the article to be more explosive, more human, or more
    commercial.
 8. Preserve protected material-slot tokens exactly once.
+9. Do not introduce new advanced modules or new rhythm DSL blocks.
 
 If the user wants rewriting, humanization, title optimization, or growth
 strategy, that should be a separate explicit action.
@@ -161,6 +209,7 @@ Code should:
 - preserve protected placeholders intact;
 - validate advanced modules if the source uses them;
 - degrade invalid modules safely to ordinary Markdown/HTML;
+- avoid introducing new module syntax during formatting-only actions;
 - log formatting mode, validation failures, retry reasons, final module names,
   and whether mobile preview validation passed.
 
@@ -219,6 +268,7 @@ Tests should cover:
 - existing old modules still render;
 - invalid old modules degrade safely;
 - no automatic `hero`, `verdict`, `cta`, ending, or summary module is injected;
+- no new module fence or rhythm DSL block is generated when the source has none;
 - retry receives concrete validation feedback;
 - fallback does not create new claims or modules.
 
