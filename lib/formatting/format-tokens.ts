@@ -105,15 +105,15 @@ export const CLAUDE_TOKENS: FormatTokens = {
 
 export const WRITEFLOW_EDITORIAL_TOKENS: FormatTokens = {
   colors: {
-    text: "#2a241f",
-    muted: "#6f6258",
-    accent: "#a45a3f",
-    accentStrong: "#7e3f2d",
-    accentAction: "#a45a3f",
-    accentSoft: "#f4ebe4",
-    accentPale: "#fbf7f2",
-    surface: "#fffdf9",
-    border: "#eaded3",
+    text: "#233044",
+    muted: "#5f7993",
+    accent: "#5f7993",
+    accentStrong: "#233044",
+    accentAction: "#233044",
+    accentSoft: "#eef2f6",
+    accentPale: "#f7f9fb",
+    surface: "#ffffff",
+    border: "rgba(35,48,68,0.16)",
     warning: "#9a6a22",
     warningSoft: "#fff8e8",
     danger: "#a33a3a",
@@ -127,7 +127,7 @@ export const WRITEFLOW_EDITORIAL_TOKENS: FormatTokens = {
     pill: "999px",
   },
   shadow: "none",
-  border: "1px solid #eaded3",
+  border: "1px solid rgba(35,48,68,0.16)",
 };
 
 export type FormatThemeId = "wechat-native" | "claude" | "writeflow-editorial";
