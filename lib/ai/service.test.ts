@@ -128,9 +128,8 @@ describe("AI service", () => {
       [
         "## 真正的问题",
         "",
-        ":::verdict",
-        "title: 真正的问题不是模型",
-        "body: 真正的问题不是模型，而是主流程还没跑通。",
+        ":::wf-pullquote",
+        "quote: 真正的问题不是模型，而是主流程还没跑通。",
         ":::",
         "",
         "先验证用户路径，再考虑模型配置。",
@@ -149,12 +148,12 @@ describe("AI service", () => {
     capture.restore();
     expect(completed).toMatchObject({
       moduleCount: 1,
-      moduleNames: ["verdict"],
+      moduleNames: ["wf-pullquote"],
       ctaCount: 0,
     });
     expect(result.draft).toMatchObject({
       label: "排版版",
-      content: expect.stringContaining(":::verdict"),
+      content: expect.stringContaining(":::wf-pullquote"),
     });
   });
 
@@ -180,7 +179,6 @@ describe("AI service", () => {
 
   it.each([
     ["empty output", ""],
-    ["dangerous html", "<script>alert(1)</script>"],
     ["content loss", "## 太短\n\n只剩一句。"],
   ])("passes through Markdown formatting output on %s", async (_label, formatted) => {
     vi.stubEnv("AI_PROVIDER", "mock");
@@ -200,6 +198,31 @@ describe("AI service", () => {
     expect(events).not.toContain("markdown_formatting_degraded");
   });
 
+  it("retries Markdown formatting output on dangerous html", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const plain = "真正的问题不是模型，而是主流程还没跑通。\n\n先验证用户路径，再考虑模型配置。";
+    const formatted = ":::wf-pullquote\nquote: 先验证用户路径，再考虑模型配置。\n:::";
+    const formatter = vi
+      .spyOn(mockAIProvider, "formatDraftMarkdown")
+      .mockResolvedValueOnce("<script>alert(1)</script>")
+      .mockResolvedValueOnce(formatted);
+    const events: string[] = [];
+
+    const result = await formatDraft({
+      draft: { id: "draft-a", label: "原始版", content: plain },
+    }, {
+      onProgress: (event) => events.push(event.stepId),
+    });
+
+    expect(formatter).toHaveBeenCalledTimes(2);
+    expect(formatter.mock.calls[1]?.[1]?.qualityFeedback).toContain(
+      "forbidden raw HTML"
+    );
+    expect(result.draft.content).toBe(formatted);
+    expect(events).toContain("markdown_formatting_completed");
+    expect(events).not.toContain("markdown_formatting_degraded");
+  });
+
   it("bubbles provider failures instead of using local Markdown fallback", async () => {
     vi.stubEnv("AI_PROVIDER", "mock");
     vi.spyOn(mockAIProvider, "formatDraftMarkdown").mockRejectedValueOnce(
@@ -213,16 +236,16 @@ describe("AI service", () => {
     ).rejects.toThrow("formatter unavailable");
   });
 
-  it("passes through a valid original module even when AI formatting changes it", async () => {
+  it("passes through a valid original legacy module when AI preserves it", async () => {
     vi.stubEnv("AI_PROVIDER", "mock");
     const original = `:::verdict
 eyebrow: 最终判断
 title: 结构比颜色重要
 body: 模块必须解决阅读任务。
 :::`;
-    vi.spyOn(mockAIProvider, "formatDraftMarkdown").mockResolvedValue(
-      original.replace(":::verdict", ":::summary")
-    );
+    const formatter = vi
+      .spyOn(mockAIProvider, "formatDraftMarkdown")
+      .mockResolvedValue(original);
     const events: string[] = [];
 
     const result = await formatDraft({
@@ -231,9 +254,8 @@ body: 模块必须解决阅读任务。
       onProgress: (event) => events.push(event.stepId),
     });
 
-    expect(result.draft.content).toBe(
-      original.replace(":::verdict", ":::summary")
-    );
+    expect(formatter).toHaveBeenCalledTimes(1);
+    expect(result.draft.content).toBe(original);
     expect(events).toContain("markdown_formatting_completed");
     expect(events).not.toContain("markdown_formatting_degraded");
   });

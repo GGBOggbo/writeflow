@@ -7,18 +7,10 @@ import type { DraftModuleLayoutOptions } from "../provider";
 function formatWriteflowModuleUsages() {
   return WRITEFLOW_MODULE_NAMES.map((name) => {
     const definition = MODULE_DEFS[name];
-    const kind =
-      definition.kind === "fields"
-        ? "字段型"
-        : definition.kind === "rows"
-          ? "行型"
-          : definition.kind === "markdown-images"
-            ? "图片型"
-            : "对话型";
 
     if (definition.kind === "fields") {
       const parts = [
-        `${name}（${kind}）｜${definition.usage}`,
+        `${name}（字段型）｜${definition.usage}`,
         `必填 ${definition.required.join(", ")}`,
       ];
       if (definition.optional.length > 0) {
@@ -27,16 +19,12 @@ function formatWriteflowModuleUsages() {
       return parts.join("｜");
     }
 
-    if (definition.kind === "rows") {
-      const columns = definition.columns
-        .map((column, index) =>
-          index < definition.requiredColumns ? column : `${column}?`
-        )
-        .join(" | ");
-      return `${name}（${kind}）｜${definition.usage}｜每行 ${columns}｜至少 ${definition.minRows} 行`;
-    }
-
-    return `${name}（${kind}）｜${definition.usage}`;
+    const columns = definition.columns
+      .map((column, index) =>
+        index < definition.requiredColumns ? column : `${column}?`
+      )
+      .join(" | ");
+    return `${name}（行型）｜${definition.usage}｜每行 ${columns}｜至少 ${definition.minRows} 行`;
   }).join("\n");
 }
 
