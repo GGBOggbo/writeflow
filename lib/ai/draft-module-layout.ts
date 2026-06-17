@@ -5,6 +5,10 @@ import {
   parseAdvancedMarkdown,
   type AdvancedModuleName,
 } from "@/lib/markdown/advanced-modules";
+import {
+  isAdvancedModuleName,
+  isLegacyAdvancedModuleName,
+} from "@/lib/markdown/module-defs";
 import { validateMarkdownPostProcessing } from "./markdown-post-processing";
 
 export type DraftModuleLayoutSource = "ai" | "ai_retry" | "local_fallback";
@@ -58,6 +62,56 @@ function moduleStats(content: string) {
     moduleNames: [...new Set(names)],
     ctaCount: names.filter((name) => name === "cta").length,
   };
+}
+
+function sourceModuleNames(content: string) {
+  return new Set(
+    parseAdvancedMarkdown(content)
+      .filter((node) => node.type === "module")
+      .map((node) => node.name)
+  );
+}
+
+function fencedModuleNames(content: string) {
+  return [...content.matchAll(/^:::([a-z0-9-]+)(?:\[[^\]]*])?\s*$/gim)]
+    .map((match) => match[1])
+    .filter(Boolean);
+}
+
+function validateFormattedLayout(source: string, formatted: string) {
+  const sourceNames = sourceModuleNames(source);
+  const introducedLegacy = parseAdvancedMarkdown(formatted)
+    .filter((node) => node.type === "module")
+    .map((node) => node.name)
+    .filter(
+      (name) => isLegacyAdvancedModuleName(name) && !sourceNames.has(name)
+    );
+
+  if (introducedLegacy.length > 0) {
+    return {
+      ok: false as const,
+      reason: `AI introduced legacy module(s): ${[...new Set(introducedLegacy)].join(", ")}. Use wf-* modules for new formatting.`,
+    };
+  }
+
+  const unsupportedModules = fencedModuleNames(formatted).filter(
+    (name) => !isAdvancedModuleName(name)
+  );
+  if (unsupportedModules.length > 0) {
+    return {
+      ok: false as const,
+      reason: `AI introduced unsupported module(s): ${[...new Set(unsupportedModules)].join(", ")}. Use only Writeflow wf-* modules for new formatting.`,
+    };
+  }
+
+  if (/<\/?[a-z][\w:-]*(?:\s|>|\/>)/i.test(formatted)) {
+    return {
+      ok: false as const,
+      reason: "AI output contains forbidden raw HTML.",
+    };
+  }
+
+  return { ok: true as const };
 }
 
 type ProtectedAdvancedModule = {
@@ -272,14 +326,36 @@ export async function layoutDraftModules(
   content: string,
   formatDraftMarkdown: DraftFormatter
 ): Promise<DraftModuleLayoutResult> {
-  const formatted = await formatDraftMarkdown(content);
-  const stats = moduleStats(formatted);
+  const first = await formatDraftMarkdown(content);
+  const firstValidation = validateFormattedLayout(content, first);
+  if (firstValidation.ok) {
+    const stats = moduleStats(first);
 
+    return {
+      content: first,
+      source: "ai",
+      attempts: 1,
+      failures: [],
+      ...stats,
+      degradedModules: 0,
+      degradationReasons: [],
+    };
+  }
+
+  const second = await formatDraftMarkdown(content, {
+    qualityFeedback: firstValidation.reason,
+  });
+  const secondValidation = validateFormattedLayout(content, second);
+  if (!secondValidation.ok) {
+    throw new Error(secondValidation.reason);
+  }
+
+  const stats = moduleStats(second);
   return {
-    content: formatted,
-    source: "ai",
-    attempts: 1,
-    failures: [],
+    content: second,
+    source: "ai_retry",
+    attempts: 2,
+    failures: [firstValidation.reason],
     ...stats,
     degradedModules: 0,
     degradationReasons: [],

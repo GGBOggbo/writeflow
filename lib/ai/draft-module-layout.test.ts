@@ -13,29 +13,45 @@ const plainDraft = [
 ].join("\n\n");
 
 describe("layoutDraftModules", () => {
-  it("passes the AI Markdown output through without validation, retry, or fallback", async () => {
-    const aiOutput = [
-      ":::verdict",
-      "content: 这是新提示词正在测试的字段",
-      "description: 代码不要拦截",
-      ":::",
-      "",
-      "<custom-html>也先保留给提示词测试</custom-html>",
-    ].join("\n");
-    const format = vi.fn().mockResolvedValue(aiOutput);
+  it("retries when AI introduces legacy modules that were not in the source", async () => {
+    const format = vi
+      .fn()
+      .mockResolvedValueOnce(`:::hero\ntitle: 借来的开场\n:::`)
+      .mockResolvedValueOnce(`:::wf-pullquote\nquote: 先验证流程，再升级配置。\n:::`);
 
     const result = await layoutDraftModules(plainDraft, format);
 
-    expect(result).toMatchObject({
-      content: aiOutput,
-      source: "ai",
-      attempts: 1,
-      failures: [],
-      degradedModules: 0,
-      degradationReasons: [],
-    });
+    expect(format).toHaveBeenCalledTimes(2);
+    expect(format.mock.calls[1]?.[1]?.qualityFeedback).toContain(
+      "legacy module"
+    );
+    expect(result.source).toBe("ai_retry");
+    expect(result.moduleNames).toEqual(["wf-pullquote"]);
+  });
+
+  it("does not retry an existing legacy module preserved from the source", async () => {
+    const source = `:::quote\nquote: 原文已有金句。\n:::\n\n正文。`;
+    const format = vi.fn().mockResolvedValue(source);
+
+    const result = await layoutDraftModules(source, format);
+
     expect(format).toHaveBeenCalledTimes(1);
-    expect(format).toHaveBeenCalledWith(plainDraft);
+    expect(result.moduleNames).toEqual(["quote"]);
+  });
+
+  it("retries when AI returns forbidden raw HTML", async () => {
+    const format = vi
+      .fn()
+      .mockResolvedValueOnce("<script>alert(1)</script>")
+      .mockResolvedValueOnce("## 正文\n\n普通段落。");
+
+    const result = await layoutDraftModules(plainDraft, format);
+
+    expect(format).toHaveBeenCalledTimes(2);
+    expect(format.mock.calls[1]?.[1]?.qualityFeedback).toContain(
+      "forbidden raw HTML"
+    );
+    expect(result.source).toBe("ai_retry");
   });
 
   it("does not protect or rewrite material placeholders before sending content to the AI", async () => {
@@ -60,12 +76,13 @@ describe("layoutDraftModules", () => {
 
   it("still reports module stats for observability without changing content", async () => {
     const formatted = [
-      ":::quote",
+      ":::wf-pullquote",
       "quote: 先验证流程，再升级配置。",
       ":::",
       "",
-      ":::cta",
-      "title: 留言说说你卡在哪一步",
+      ":::wf-section",
+      "index: 01",
+      "title: 先跑主流程",
       ":::",
     ].join("\n");
 
@@ -75,8 +92,8 @@ describe("layoutDraftModules", () => {
     );
 
     expect(result.moduleCount).toBe(2);
-    expect(result.moduleNames).toEqual(["quote", "cta"]);
-    expect(result.ctaCount).toBe(1);
+    expect(result.moduleNames).toEqual(["wf-pullquote", "wf-section"]);
+    expect(result.ctaCount).toBe(0);
     expect(result.content).toBe(formatted);
   });
 });
