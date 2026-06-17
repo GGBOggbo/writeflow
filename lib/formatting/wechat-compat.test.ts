@@ -107,9 +107,26 @@ describe("normalizeWechatHtml", () => {
     const cards = doc.querySelectorAll("article > section > div > section");
 
     expect(cards).toHaveLength(2);
-    expect((cards[0] as HTMLElement).style.display).toBe("block");
     expect((cards[0] as HTMLElement).style.width).toBe("100%");
+    expect((cards[0] as HTMLElement).style.display).toBe("");
     expect(output).not.toMatch(/display:\s*grid|grid-template-columns/i);
+  });
+
+  it("normalizes wf modules into copy-safe inline HTML", () => {
+    const output = normalizeWechatHtml(`
+      <article data-wechat-theme="writeflow" class="preview">
+        <section data-writeflow-module="wf-points" class="wf" style="display:grid;grid-template-columns:1fr 1fr;color:var(--fg);transform:translateY(1px);">
+          <section style="display:flex;gap:12px;"><p>01</p><p>先跑通</p></section>
+        </section>
+      </article>
+    `);
+
+    expect(output).toContain("先跑通");
+    expect(output).not.toContain("data-writeflow-module");
+    expect(output).not.toContain("class=");
+    expect(output).not.toContain("var(--fg)");
+    expect(output).not.toContain("grid-template-columns");
+    expect(output).not.toContain("transform:");
   });
 
   it("stacks image comparisons and keeps both labelled images", () => {
@@ -151,8 +168,8 @@ describe("normalizeWechatHtml", () => {
     expect(doc.querySelectorAll("img")).toHaveLength(3);
     expect(output).not.toMatch(/overflow-[xy]:\s*auto|white-space:\s*nowrap|max-height/i);
     for (const figure of doc.querySelectorAll("figure")) {
-      expect((figure as HTMLElement).style.display).toBe("block");
       expect((figure as HTMLElement).style.width).toBe("100%");
+      expect((figure as HTMLElement).style.display).toBe("");
     }
   });
 

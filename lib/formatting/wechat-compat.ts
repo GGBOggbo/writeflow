@@ -84,48 +84,97 @@ const STACKED_MODULES = [
   "cta",
 ] as const;
 
+const FORBIDDEN_STYLE_PROPERTIES = [
+  "display",
+  "grid-template-columns",
+  "grid-template-rows",
+  "grid-auto-flow",
+  "position",
+  "z-index",
+  "transform",
+  "filter",
+  "backdrop-filter",
+  "animation",
+  "transition",
+  "gap",
+  "column-gap",
+  "row-gap",
+  "flex-direction",
+  "flex-wrap",
+  "justify-content",
+  "align-items",
+  "overflow-x",
+  "overflow-y",
+  "scroll-snap-type",
+  "scroll-snap-align",
+] as const;
+
 function removeLayoutStyles(element: HTMLElement) {
-  for (const property of [
-    "display",
-    "grid-template-columns",
-    "grid-template-rows",
-    "grid-auto-flow",
-    "gap",
-    "column-gap",
-    "row-gap",
-    "flex-direction",
-    "flex-wrap",
-    "justify-content",
-    "align-items",
-  ]) {
+  for (const property of FORBIDDEN_STYLE_PROPERTIES) {
     element.style.removeProperty(property);
   }
+}
+
+function stackLayoutGroups(module: HTMLElement) {
+  module.querySelectorAll<HTMLElement>("div, section").forEach((group) => {
+    const style = group.getAttribute("style") ?? "";
+    if (!/display\s*:\s*(?:flex|grid)/i.test(style)) return;
+
+    removeLayoutStyles(group);
+    group.style.display = "block";
+    Array.from(group.children).forEach((child, index, children) => {
+      if (!(child instanceof HTMLElement)) return;
+      child.style.display = "block";
+      child.style.width = "100%";
+      child.style.maxWidth = "100%";
+      child.style.boxSizing = "border-box";
+      if (index < children.length - 1 && !child.style.marginBottom) {
+        child.style.marginBottom = "12px";
+      }
+    });
+  });
 }
 
 function stackAdvancedModuleLayouts(root: HTMLElement) {
   for (const name of STACKED_MODULES) {
     root
       .querySelectorAll<HTMLElement>(`[data-mpa-action-id="${name}"]`)
-      .forEach((module) => {
-        module.querySelectorAll<HTMLElement>("div, section").forEach((group) => {
-          const style = group.getAttribute("style") ?? "";
-          if (!/display\s*:\s*(?:flex|grid)/i.test(style)) return;
-
-          removeLayoutStyles(group);
-          group.style.display = "block";
-          Array.from(group.children).forEach((child, index, children) => {
-            if (!(child instanceof HTMLElement)) return;
-            child.style.display = "block";
-            child.style.width = "100%";
-            child.style.maxWidth = "100%";
-            child.style.boxSizing = "border-box";
-            if (index < children.length - 1 && !child.style.marginBottom) {
-              child.style.marginBottom = "12px";
-            }
-          });
-        });
-      });
+      .forEach(stackLayoutGroups);
   }
+
+  root
+    .querySelectorAll<HTMLElement>("[data-writeflow-module]")
+    .forEach(stackLayoutGroups);
+}
+
+function removeUnsupportedCss(element: HTMLElement) {
+  removeLayoutStyles(element);
+
+  const style = element.getAttribute("style") ?? "";
+  if (!/var\(|color-mix\(|calc\(|@|url\(/i.test(style)) {
+    if (!element.getAttribute("style")?.trim()) {
+      element.removeAttribute("style");
+    }
+    return;
+  }
+
+  const safeStyle = style
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => part && !/var\(|color-mix\(|calc\(|@|url\(/i.test(part))
+    .join(";");
+
+  if (safeStyle) {
+    element.setAttribute("style", safeStyle);
+  } else {
+    element.removeAttribute("style");
+  }
+}
+
+function removeUnsupportedCssFromTree(root: HTMLElement) {
+  [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))].forEach(
+    removeUnsupportedCss
+  );
 }
 
 function flattenGalleryAndLongImages(root: HTMLElement) {
@@ -229,6 +278,7 @@ export function normalizeWechatHtml(html: string) {
   flattenListParagraphs(root, doc);
   attachPunctuationToEmphasis(root);
   applyTypography(root);
+  removeUnsupportedCssFromTree(root);
   removeUnsafeAndInternalMarkup(root);
 
   return root.outerHTML;
