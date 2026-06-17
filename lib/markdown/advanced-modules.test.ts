@@ -5,6 +5,7 @@ import {
   hasAdvancedModules,
   parseAdvancedMarkdown,
   validateAdvancedModuleContracts,
+  validateAdvancedModuleNode,
 } from "./advanced-modules";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -51,8 +52,8 @@ AI: 为了让结构稳定。
     expect(nodes[4]).toMatchObject({ type: "markdown", content: "结尾正文。" });
   });
 
-  it("recognizes the complete 31-module catalog", () => {
-    expect(ADVANCED_MODULE_NAMES).toHaveLength(31);
+  it("recognizes the complete 39-module catalog", () => {
+    expect(ADVANCED_MODULE_NAMES).toHaveLength(39);
 
     for (const name of ADVANCED_MODULE_NAMES) {
       const markdown = `:::${name}\nvalue: 示例\n:::`;
@@ -62,6 +63,22 @@ AI: 为了让结构稳定。
       expect(nodes[0]).toMatchObject({ type: "module", name });
       expect(hasAdvancedModules(markdown)).toBe(true);
     }
+  });
+
+  it("parses and validates Writeflow wf row modules", () => {
+    const [node] = parseAdvancedMarkdown(`:::wf-steps
+01 | 先确认主流程 | 不急着堆功能。
+02 | 再验证预览 | 确认手机端愿意读。
+:::`);
+
+    expect(node?.type).toBe("module");
+    if (!node || node.type !== "module") throw new Error("Expected module");
+    expect(node.name).toBe("wf-steps");
+    expect(node.rows).toEqual([
+      ["01", "先确认主流程", "不急着堆功能。"],
+      ["02", "再验证预览", "确认手机端愿意读。"],
+    ]);
+    expect(validateAdvancedModuleNode(node)).toEqual({ ok: true });
   });
 
   it("keeps unknown and unclosed module syntax visibly editable", () => {
@@ -94,7 +111,7 @@ flow: 判断重点 | 组织模块 | 统一输出
     });
   });
 
-  it("validates all 31 modules in the complete local fixture", () => {
+  it("validates all legacy modules in the complete local fixture", () => {
     const fixture = readFileSync(
       join(
         process.cwd(),

@@ -3,14 +3,40 @@ import {
   ADVANCED_MODULE_NAMES,
   MODULE_DEFS,
   formatAdvancedModuleContracts,
+  formatAdvancedModuleUsages,
+  isLegacyAdvancedModuleName,
+  isWriteflowModuleName,
 } from "./module-defs";
 
 describe("MODULE_DEFS", () => {
   it("defines one contract for every supported advanced module", () => {
-    expect(ADVANCED_MODULE_NAMES).toHaveLength(31);
+    expect(ADVANCED_MODULE_NAMES).toHaveLength(39);
     expect(Object.keys(MODULE_DEFS).sort()).toEqual(
       [...ADVANCED_MODULE_NAMES].sort()
     );
+  });
+
+  it("exposes Writeflow-owned wf modules without removing legacy modules", () => {
+    expect(ADVANCED_MODULE_NAMES).toContain("wf-section");
+    expect(ADVANCED_MODULE_NAMES).toContain("wf-pullquote");
+    expect(ADVANCED_MODULE_NAMES).toContain("hero");
+    expect(isWriteflowModuleName("wf-points")).toBe(true);
+    expect(isWriteflowModuleName("cards")).toBe(false);
+    expect(isLegacyAdvancedModuleName("cards")).toBe(true);
+    expect(isLegacyAdvancedModuleName("wf-points")).toBe(false);
+  });
+
+  it("documents wf modules as reading rhythm modules", () => {
+    const usages = formatAdvancedModuleUsages();
+
+    expect(usages).toContain("wf-section");
+    expect(usages).toContain("阅读节奏");
+    expect(usages).not.toContain("brand: md2wechat");
+    expect(MODULE_DEFS["wf-steps"]).toMatchObject({
+      kind: "rows",
+      columns: ["index", "heading", "body"],
+      requiredColumns: 3,
+    });
   });
 
   it("describes required, optional, and repeatable field modules", () => {
@@ -96,6 +122,6 @@ describe("MODULE_DEFS", () => {
     expect(contracts).toContain(
       "dialogue｜对话卡，用于呈现两方以上的问答、讨论或模拟对话。｜对话型｜至少 2 行“角色: 内容”"
     );
-    expect(contracts.split("\n")).toHaveLength(31);
+    expect(contracts.split("\n")).toHaveLength(39);
   });
 });

@@ -1,4 +1,4 @@
-export const ADVANCED_MODULE_NAMES = [
+export const LEGACY_ADVANCED_MODULE_NAMES = [
   "hero",
   "cards",
   "metrics",
@@ -30,6 +30,22 @@ export const ADVANCED_MODULE_NAMES = [
   "series",
   "subscribe",
   "cta",
+] as const;
+
+export const WRITEFLOW_MODULE_NAMES = [
+  "wf-lead",
+  "wf-section",
+  "wf-pullquote",
+  "wf-points",
+  "wf-steps",
+  "wf-note",
+  "wf-compare",
+  "wf-image-note",
+] as const;
+
+export const ADVANCED_MODULE_NAMES = [
+  ...LEGACY_ADVANCED_MODULE_NAMES,
+  ...WRITEFLOW_MODULE_NAMES,
 ] as const;
 
 export type AdvancedModuleName = (typeof ADVANCED_MODULE_NAMES)[number];
@@ -329,14 +345,89 @@ export const MODULE_DEFS = {
       distinctFields: [["title", "note"]],
     },
   },
+  "wf-lead": {
+    usage: "Writeflow 开场阅读节奏块，用于呈现原文已有开场、开篇判断或导入段。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label", "title"],
+  },
+  "wf-section": {
+    usage: "Writeflow 章节阅读节奏块，用于呈现原文已有章节编号、小标题和过渡说明。",
+    kind: "fields",
+    required: ["index", "title"],
+    optional: ["subtitle"],
+  },
+  "wf-pullquote": {
+    usage: "Writeflow 金句阅读节奏块，用于突出原文已有高价值句子。",
+    kind: "fields",
+    required: ["quote"],
+    optional: ["label", "source"],
+    constraints: {
+      maxChars: {
+        quote: 120,
+        label: 12,
+        source: 24,
+      },
+    },
+  },
+  "wf-points": {
+    usage: "Writeflow 并列要点阅读节奏块，用于呈现原文已有平级观点、理由或对象。",
+    kind: "rows",
+    columns: ["index", "heading", "body"],
+    requiredColumns: 3,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-steps": {
+    usage: "Writeflow 步骤阅读节奏块，用于呈现原文已有顺序步骤或检查项。",
+    kind: "rows",
+    columns: ["index", "heading", "body"],
+    requiredColumns: 3,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-note": {
+    usage: "Writeflow 提醒阅读节奏块，用于呈现原文已有提醒、边界、风险或补充说明。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label", "title"],
+  },
+  "wf-compare": {
+    usage: "Writeflow 对比阅读节奏块，用于呈现原文已有对比、前后差异或两种选择。",
+    kind: "rows",
+    columns: ["side", "heading", "body"],
+    requiredColumns: 3,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-image-note": {
+    usage: "Writeflow 图片说明阅读节奏块，用于绑定原文已有图片和说明文字。",
+    kind: "fields",
+    required: ["image"],
+    optional: ["title", "body", "alt", "note"],
+  },
 } as const satisfies Record<AdvancedModuleName, AdvancedModuleDef>;
 
 const MODULE_NAME_SET = new Set<string>(ADVANCED_MODULE_NAMES);
+const WRITEFLOW_MODULE_NAME_SET = new Set<string>(WRITEFLOW_MODULE_NAMES);
+const LEGACY_MODULE_NAME_SET = new Set<string>(LEGACY_ADVANCED_MODULE_NAMES);
 
 export function isAdvancedModuleName(
   value: string
 ): value is AdvancedModuleName {
   return MODULE_NAME_SET.has(value);
+}
+
+export function isWriteflowModuleName(
+  value: string
+): value is (typeof WRITEFLOW_MODULE_NAMES)[number] {
+  return WRITEFLOW_MODULE_NAME_SET.has(value);
+}
+
+export function isLegacyAdvancedModuleName(
+  value: string
+): value is (typeof LEGACY_ADVANCED_MODULE_NAMES)[number] {
+  return LEGACY_MODULE_NAME_SET.has(value);
 }
 
 export function formatAdvancedModuleContracts() {

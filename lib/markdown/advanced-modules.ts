@@ -24,6 +24,9 @@ const ROW_MODULES = new Set<AdvancedModuleName>([
   "specs",
   "image-steps",
   "notice",
+  "wf-points",
+  "wf-steps",
+  "wf-compare",
 ]);
 
 const SPECIAL_MODULES = new Set<AdvancedModuleName>([
