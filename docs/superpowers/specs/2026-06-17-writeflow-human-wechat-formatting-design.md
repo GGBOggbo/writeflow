@@ -15,6 +15,12 @@ The system must also stop looking like a 1:1 copy of another formatter. The
 shared idea of Markdown containers is acceptable; copied module names, field
 semantics, HTML structure, class names, and visual styling are not.
 
+Open Design may be used as a design reference, especially its token discipline,
+editorial restraint, component contracts, and clear anti-patterns. It must not
+be copied as a visual implementation. Writeflow's WeChat HTML has stricter
+constraints than a web app: the copied result must survive being pasted into the
+WeChat public account editor.
+
 ## Scope
 
 The formatter owns presentation:
@@ -258,18 +264,69 @@ Writeflow renderers should use their own stable attributes, for example
 `data-writeflow-module`, `data-writeflow-version`, and
 `data-writeflow-role`, rather than inherited third-party naming.
 
-The visual style should be restrained and public-account native:
+Open Design reference should be translated into WeChat-safe principles:
 
-- typography and spacing first;
-- subtle section rhythm instead of web-card density;
-- minimal borders and background blocks;
-- no decorative component look unless the source content truly needs a framed
-  block;
-- WeChat-safe inline CSS with deterministic output.
+- use token discipline, not ad-hoc colors;
+- use typography and spacing first;
+- use one quiet accent family rather than many decorative colors;
+- use subtle section rhythm instead of web-card density;
+- use minimal borders and background blocks;
+- avoid hover, animation, pseudo-elements, glass effects, paper noise,
+  external fonts, and complex layout tricks;
+- keep every visible decision expressible as WeChat-safe inline CSS.
+
+The initial Writeflow editorial token direction should be inspired by
+Open Design's warm/editorial systems but adapted for this product:
+
+| Role | Direction |
+| --- | --- |
+| Text | warm near-black, optimized for long mobile reading. |
+| Muted text | warm gray-brown for captions and small labels. |
+| Accent | restrained brown/terracotta for section marks and pullquote lines. |
+| Border | very light warm neutral, used sparingly. |
+| Surface | mostly transparent or very light warm paper blocks. |
+
+Exact hex values belong in renderer tokens and tests. They should be
+Writeflow-owned values, not a direct copy of an Open Design palette.
 
 The goal is not novelty for its own sake. It is a distinct implementation and
 visual language that serves the same public-account reading task without copying
 another project's module system or renderer structure.
+
+## WeChat Copy HTML Contract
+
+The preview may contain extra diagnostic attributes for development, but the
+copy payload must work after paste into the WeChat editor.
+
+The copy HTML must:
+
+- use inline `style` attributes for all required visual styling;
+- avoid relying on classes, CSS variables, external stylesheets, style tags,
+  scripts, pseudo-elements, hover states, media queries, or custom fonts;
+- avoid CSS Grid, complex flex layouts, fixed/absolute positioning, z-index
+  choreography, filters, blend modes, animations, transforms, and unsupported
+  modern CSS functions such as `color-mix`;
+- use conservative tags such as `section`, `p`, `span`, `strong`, `em`, `img`,
+  `a`, `ul`, `ol`, `li`, `blockquote`, and simple table-like structures only
+  when necessary;
+- keep images as normal inline content with safe width and height rules;
+- keep module blocks self-contained so the WeChat editor can preserve spacing
+  even if it strips nonessential attributes;
+- escape user text and never pass through raw untrusted HTML;
+- produce a plain article fragment, not a full HTML document.
+
+Preview-only attributes such as `data-writeflow-module` may exist in local
+preview HTML, but the copied article must not depend on them for layout or
+appearance. If WeChat strips those attributes, the article should still look
+correct because the visual contract lives in inline styles.
+
+Verification must include both:
+
+- deterministic sanitizer checks for forbidden tags, attributes, and CSS
+  features;
+- browser-based paste/copy verification using representative article samples,
+  including long paragraphs, headings, `wf-*` modules, images, lists, and
+  legacy modules.
 
 ## Prompt Boundary
 
@@ -310,6 +367,8 @@ Code should:
 - render new `wf-*` modules with Writeflow-owned HTML structures and inline
   styles;
 - keep module rendering deterministic and WeChat-compatible;
+- produce a separate copy-safe HTML fragment that does not rely on preview-only
+  classes, data attributes, or external CSS;
 - log formatting mode, validation failures, retry reasons, final module names,
   and whether mobile preview validation passed.
 
@@ -326,7 +385,7 @@ Code should not:
 
 1. Validate the formatted result for placeholder preservation, truncation, basic
    Markdown structure, module contracts, visible Markdown artifacts, malformed
-   HTML, and mobile reading parameters.
+   HTML, WeChat-copy compatibility, and mobile reading parameters.
 2. Retry once with concrete validation feedback if AI formatting was used.
 3. If both AI attempts fail, return a conservative local Markdown-to-HTML
    fallback.
@@ -346,7 +405,10 @@ ready. The check should verify:
 - visible Markdown artifacts;
 - unsupported module fences;
 - obvious overflow or spacing problems;
-- copy HTML integrity.
+- copy HTML integrity;
+- absence of forbidden copy HTML features such as style tags, scripts, CSS
+  variables, classes-as-contract, pseudo-elements, unsupported layout CSS, and
+  external resources.
 
 This can begin as deterministic HTML/CSS validation and later be paired with
 browser screenshot review for representative mobile widths.
@@ -374,6 +436,11 @@ Tests should cover:
 - unsupported modules and rhythm DSL blocks are rejected or retried;
 - new module HTML uses Writeflow-owned attributes, structure, and inline style
   rules rather than copied renderer markup;
+- copied HTML passes the WeChat-safe sanitizer and does not depend on classes,
+  data attributes, CSS variables, external CSS, hover, animation, pseudo
+  elements, grid, or fixed positioning;
+- representative paste/copy samples preserve readable spacing and module
+  styling after the editor receives the HTML fragment;
 - retry receives concrete validation feedback;
 - fallback does not create new claims or modules.
 
@@ -406,6 +473,8 @@ The feature is successful when the same article content:
   renderer;
 - uses Writeflow-owned module names and HTML style structures for new formatted
   output;
+- produces a copy-safe HTML fragment whose visual result survives WeChat editor
+  paste;
 - contains no visible Markdown artifacts or broken module fences;
 - preserves the user's wording, facts, order, examples, title, and CTA;
 - still lets older module-based drafts preview and copy correctly.
