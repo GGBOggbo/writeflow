@@ -27,6 +27,8 @@ const ROW_MODULES = new Set<AdvancedModuleName>([
   "wf-points",
   "wf-steps",
   "wf-compare",
+  "wf-toc",
+  "wf-timeline",
 ]);
 
 const SPECIAL_MODULES = new Set<AdvancedModuleName>([

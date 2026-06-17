@@ -289,6 +289,108 @@ source: 原文
     expect(points).not.toContain("display:grid");
   });
 
+  // ===== 批次1:8 个新模块渲染测试 =====
+  it("renders wf-toc as a numbered directory list", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-toc
+01 | 先确认主流程 | main
+02 | 再验证复制效果 | copy
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-toc"');
+    expect(html).toContain("先确认主流程");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-quote with left block and pale background", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-quote
+body: 排版的核心是让读者的眼睛有地方休息。
+source: 原文
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-quote"');
+    expect(html).toContain("排版的核心");
+    expect(html).toContain("border-left:4px solid");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-highlight as a centered banner with top bar", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-highlight
+body: 预览好看不算完成，粘贴不塌才算完成。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-highlight"');
+    expect(html).toContain("text-align:center");
+    expect(html).toContain("border-top:3px solid");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-faq with Q anchor and indented answer", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-faq
+question: 排版会改写我的内容吗？
+answer: 不会，只改呈现节奏，不改内容。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-faq"');
+    expect(html).toContain("排版会改写");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-metric with large centered number", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-metric
+value: 12
+label: 核心模块数
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-metric"');
+    expect(html).toContain("font-size:36px");
+    expect(html).toContain("text-align:center");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-timeline as a vertical axis with dot anchors", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-timeline
+06-01 | 项目启动 | 第一版原型。
+06-17 | 排版完成 | 33 个模块就位。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-timeline"');
+    expect(html).toContain("项目启动");
+    expect(html).toContain("border-radius:999px");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-callout with top color bar and pale box", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-callout
+title: 阶段小结
+body: 先跑通主流程，再谈优化。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-callout"');
+    expect(html).toContain("border-top:3px solid");
+    expect(html).toContain("阶段小结");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-signoff centered with divider and signature", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-signoff
+body: 愿你下次开发更顺。
+signature: —— Writeflow
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-signoff"');
+    expect(html).toContain("text-align:center");
+    expect(html).toContain("Writeflow");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
   it("uses the shared wechat-native visual contract", () => {
     const html = renderAdvancedModule(parseModule(MODULE_SAMPLES.hero.markdown));
 

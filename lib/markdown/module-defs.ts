@@ -41,6 +41,15 @@ export const WRITEFLOW_MODULE_NAMES = [
   "wf-note",
   "wf-compare",
   "wf-image-note",
+  // 批次1:高频模块
+  "wf-toc",
+  "wf-quote",
+  "wf-highlight",
+  "wf-faq",
+  "wf-metric",
+  "wf-timeline",
+  "wf-callout",
+  "wf-signoff",
 ] as const;
 
 export const ADVANCED_MODULE_NAMES = [
@@ -405,6 +414,59 @@ export const MODULE_DEFS = {
     kind: "fields",
     required: ["image"],
     optional: ["title", "body", "alt", "note"],
+  },
+  // ===== 批次1:高频模块 =====
+  "wf-toc": {
+    usage: "Writeflow 目录阅读节奏块，用于呈现长文导航。索引从原文章节顺序抽取。",
+    kind: "rows",
+    columns: ["index", "title", "anchor"],
+    requiredColumns: 2,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-quote": {
+    usage: "Writeflow 长引用块，用于呈现原文已有的较长引用。区别于 wf-pullquote：带浅底背景块，承载更长文本。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label", "source"],
+  },
+  "wf-highlight": {
+    usage: "Writeflow 关键句横幅强调块，用于呈现全文最重要的单句。全宽色条 + 居中文字。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label"],
+  },
+  "wf-faq": {
+    usage: "Writeflow 问答阅读节奏块，用于呈现原文已有的单个问答。Q 标记锚 + 缩进答案。",
+    kind: "fields",
+    required: ["question", "answer"],
+    optional: ["label"],
+  },
+  "wf-metric": {
+    usage: "Writeflow 单个关键数据块，用于呈现原文已有的核心数字。超大数字 + 标签。",
+    kind: "fields",
+    required: ["value"],
+    optional: ["label", "unit"],
+  },
+  "wf-timeline": {
+    usage: "Writeflow 时间线阅读节奏块，用于呈现原文已有的事件序列。时间点 + 左侧竖线。",
+    kind: "rows",
+    columns: ["time", "event", "detail"],
+    requiredColumns: 2,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-callout": {
+    usage: "Writeflow 总结性提示框，用于呈现原文已有的阶段性小结。比 wf-note 更显眼：顶部色条 + 浅底盒。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label", "title"],
+  },
+  "wf-signoff": {
+    usage: "Writeflow 文末结束语块，用于呈现原文已有的收尾。居中 + 分隔线 + 签名。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["signature"],
   },
 } as const satisfies Record<AdvancedModuleName, AdvancedModuleDef>;
 

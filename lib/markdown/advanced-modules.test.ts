@@ -52,8 +52,8 @@ AI: 为了让结构稳定。
     expect(nodes[4]).toMatchObject({ type: "markdown", content: "结尾正文。" });
   });
 
-  it("recognizes the complete 39-module catalog", () => {
-    expect(ADVANCED_MODULE_NAMES).toHaveLength(39);
+  it("recognizes the complete 47-module catalog", () => {
+    expect(ADVANCED_MODULE_NAMES).toHaveLength(47);
 
     for (const name of ADVANCED_MODULE_NAMES) {
       const markdown = `:::${name}\nvalue: 示例\n:::`;
