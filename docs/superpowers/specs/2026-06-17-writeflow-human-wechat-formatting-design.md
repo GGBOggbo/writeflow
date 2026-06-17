@@ -5,6 +5,10 @@
 Make Writeflow's formatted preview and WeChat-copy output look like a clean,
 mobile-first WeChat public account article.
 
+The real product goal is reading continuation: AI layout orchestration and the
+HTML renderer should make the same article feel comfortable enough that a mobile
+reader wants to keep reading.
+
 This spec is about formatting only. It must not change the article's meaning,
 strategy, title promise, author identity, cases, data, call to action, or
 argument. Writing quality rules such as title formulas, human voice, case
@@ -31,6 +35,7 @@ The formatter owns presentation:
 - mobile reading density;
 - paragraph spacing and line breaks;
 - heading and emphasis rendering;
+- reading rhythm and visual pause placement;
 - removal or neutralization of visible formatting artifacts;
 - compatibility with existing advanced modules.
 
@@ -81,6 +86,37 @@ The managed preview and WeChat-copy HTML should target:
 
 The 1.6 side inset means left and right paragraph spacing. It is not first-line
 indentation.
+
+## Reading Continuation Rules
+
+The formatter should make reading feel easier, not more decorative.
+
+AI layout orchestration should choose modules and emphasis according to reading
+jobs:
+
+- help the reader recognize the opening, section shifts, key pauses, examples,
+  steps, comparisons, and reminders already present in the text;
+- create visual breathing room before the reader feels tired;
+- prevent a long run of identical paragraphs from becoming a wall of text;
+- use modules as rest points, not as ornamental cards;
+- keep emphasis sparse enough that bold text still means something;
+- keep the first screen calm and readable, with no heavy card stack that delays
+  the actual article.
+
+The renderer should support that rhythm:
+
+- ordinary paragraphs remain visually quiet;
+- section transitions are obvious without feeling like web banners;
+- pullquotes or notes should create a short pause, not dominate the page;
+- points and steps should be easier to scan than the same content in a dense
+  paragraph;
+- image modules should keep captions and explanations close to the image;
+- vertical spacing should make the reader feel the article is breathable, not
+  broken into disconnected fragments.
+
+This is still formatting. If the article lacks a strong opening, example, or
+ending, the formatter may reveal that weakness through layout, but it must not
+fix it by writing new content.
 
 ## Content Preservation
 
@@ -338,7 +374,7 @@ If an AI formatting prompt is used, it must be framed as a typesetting task:
 4. Add or adjust line breaks only at safe punctuation boundaries.
 5. Apply heading, bold, paragraph, and spacing conventions.
 6. Use supported Writeflow `wf-*` modules when they help the existing content
-   render better in WeChat.
+   render better in WeChat and make reading continuation easier.
 7. Keep every module field grounded in the source article.
 8. Do not add new headings, openings, endings, examples, or CTAs.
 9. Do not rewrite the article to be more explosive, more human, or more
@@ -400,6 +436,9 @@ ready. The check should verify:
 
 - title and heading rendering;
 - paragraph density;
+- long runs of visually identical paragraphs;
+- module frequency and whether modules create useful pauses rather than clutter;
+- first-screen readability;
 - line height;
 - left/right side inset;
 - visible Markdown artifacts;
@@ -412,6 +451,18 @@ ready. The check should verify:
 
 This can begin as deterministic HTML/CSS validation and later be paired with
 browser screenshot review for representative mobile widths.
+
+Reading continuation validation should use representative samples:
+
+- a plain essay with no modules;
+- a long article with many short paragraphs;
+- an article with existing quotes, steps, comparisons, and images;
+- a legacy module-heavy draft;
+- a weakly structured draft where the formatter must stay conservative.
+
+For each sample, the result should be judged on mobile preview by whether the
+layout feels breathable, scannable, and calm enough to keep reading. Failing
+that judgment is a formatting failure even if the HTML is syntactically valid.
 
 ## Testing
 
@@ -430,6 +481,13 @@ Tests should cover:
 - existing old modules still render;
 - AI-introduced `wf-*` modules render when all fields are grounded in source
   content;
+- AI module selection improves reading rhythm without creating visual clutter;
+- long runs of identical paragraph rendering are detected and improved through
+  safe spacing, headings, or source-grounded modules;
+- module density stays restrained enough that the article still feels like an
+  article;
+- first-screen mobile preview is readable and not blocked by heavy decorative
+  modules;
 - invalid old modules degrade safely;
 - no automatic `hero`, `verdict`, `cta`, ending, or summary module is injected;
 - legacy module names are not requested in new AI formatting prompts;
@@ -465,12 +523,14 @@ Tests should cover:
 The feature is successful when the same article content:
 
 - previews like a finished WeChat public-account article on mobile;
+- feels comfortable enough to keep reading on a phone;
 - copies as clean WeChat-compatible HTML;
 - uses readable font size, line height, justified text, and left/right side
   inset;
 - renders headings, numeric anchors, and bold emphasis cleanly;
 - renders AI-selected supported modules through the existing parser and HTML
   renderer;
+- uses modules as reading pauses and scan aids, not decorative noise;
 - uses Writeflow-owned module names and HTML style structures for new formatted
   output;
 - produces a copy-safe HTML fragment whose visual result survives WeChat editor
