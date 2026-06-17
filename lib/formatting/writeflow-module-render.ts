@@ -192,6 +192,90 @@ function renderWfSignoff(node: AdvancedModuleNode) {
   );
 }
 
+// ===== 批次2:常用模块渲染器(应用 open-design elevation 四级纪律) =====
+
+// wf-hook: 居中悬念 + 省略号(elevation: flat,独有:纯居中大字悬念)
+function renderWfHook(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-hook",
+    `${label(node.fields.label)}<p style="margin:0;font-size:18px;line-height:1.7;color:${T.colors.text};font-weight:700;text-align:center;">${escapeHtml(node.fields.body)}<span style="color:${T.colors.muted};font-weight:400;"> ……</span></p>`,
+    `padding:16px 0;text-align:center;`,
+  );
+}
+
+// wf-part: 超大编号 + 粗线(elevation: flat,独有:超大编号字号 + 顶部粗线)
+function renderWfPart(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-part",
+    `<p style="margin:0 0 4px;font-size:13px;line-height:1.4;color:${T.colors.accent};font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${escapeHtml(node.fields.label)}</p><p style="margin:0;font-size:28px;line-height:1.2;color:${T.colors.text};font-weight:800;">${escapeHtml(node.fields.title)}</p>${node.fields.subtitle ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:${T.colors.muted};">${escapeHtml(node.fields.subtitle)}</p>` : ""}`,
+    `padding:20px 0 8px;border-top:2px solid ${T.colors.text};`,
+  );
+}
+
+// wf-divider: 居中装饰符号(elevation: flat,独有:纯符号居中,无文字)
+function renderWfDivider(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const ornaments: Record<string, string> = { dot: "· · ·", line: "———", star: "✦ ✦ ✦" };
+  const symbol = ornaments[node.fields.ornament] || ornaments.dot;
+  return root("wf-divider", `<p style="margin:0;font-size:16px;color:${T.colors.muted};text-align:center;letter-spacing:0.3em;">${escapeHtml(symbol)}</p>`, `padding:16px 0;text-align:center;`);
+}
+
+// wf-aside: 左缩进 + 浅底(elevation: ring,独有:左缩进 + 无竖线,区别 note)
+function renderWfAside(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-aside",
+    `${label(node.fields.label)}<p style="margin:0;font-size:14px;line-height:1.8;color:${T.colors.muted};">${escapeHtml(node.fields.body)}</p>`,
+    `margin:0 0 0 20px;padding:12px 16px;background:${T.colors.accentPale};border-radius:${T.radius.small};`,
+  );
+}
+
+// wf-proscons: 双列 + 顶标签(elevation: ring,独有:两列对照 + side 区分正反)
+function renderWfProscons(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const cells = node.rows
+    .map(
+      ([side = "", item = "", detail = ""]) =>
+        `<section style="box-sizing:border-box;padding:14px;border-radius:${T.radius.medium};box-shadow:0 0 0 1px ${T.colors.border};"><p style="margin:0 0 6px;font-size:12px;font-weight:700;color:${side.includes("优") || side.includes("优") ? T.colors.accent : T.colors.muted};letter-spacing:0.05em;">${escapeHtml(side)}</p><p style="margin:0 0 4px;font-size:15px;line-height:1.5;color:${T.colors.text};font-weight:700;">${escapeHtml(item)}</p>${detail ? `<p style="margin:0;font-size:14px;line-height:1.7;color:${T.colors.muted};">${escapeHtml(detail)}</p>` : ""}</section>`,
+    )
+    .join("");
+  return root("wf-proscons", `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:12px;">${cells}</section>`);
+}
+
+// wf-stats: 数据网格(open-design 式深度:圆角大间距,不用阴影;独有:数字放大)
+function renderWfStats(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const cells = node.rows
+    .map(
+      ([value = "", label = "", unit = ""]) =>
+        `<section style="box-sizing:border-box;padding:16px 12px;background:${T.colors.accentPale};border-radius:${T.radius.medium};text-align:center;"><p style="margin:0;font-size:24px;line-height:1.1;color:${T.colors.accent};font-weight:800;">${escapeHtml(value)}${unit ? `<span style="font-size:13px;font-weight:600;">${escapeHtml(unit)}</span>` : ""}</p>${label ? `<p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:${T.colors.muted};">${escapeHtml(label)}</p>` : ""}</section>`,
+    )
+    .join("");
+  return root("wf-stats", `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:12px;">${cells}</section>`);
+}
+
+// wf-case: 标题 + 正文 + 结果高亮(elevation: ring-accent,独有:结果块用 accent 描边环)
+function renderWfCase(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-case",
+    `<p style="margin:0 0 8px;font-size:16px;line-height:1.5;color:${T.colors.text};font-weight:700;">${escapeHtml(node.fields.title)}</p><p style="margin:0 0 12px;font-size:15px;line-height:1.8;color:${T.colors.text};">${escapeHtml(node.fields.body)}</p>${node.fields.result ? `<section style="padding:12px 14px;border-radius:${T.radius.small};box-shadow:0 0 0 1px ${T.colors.accent};"><p style="margin:0;font-size:14px;line-height:1.7;color:${T.colors.text};"><span style="color:${T.colors.accent};font-weight:700;">结果：</span>${escapeHtml(node.fields.result)}</p></section>` : ""}`,
+    `padding:16px;border-radius:${T.radius.medium};box-shadow:0 0 0 1px ${T.colors.border};`,
+  );
+}
+
+// wf-author: 居中作者卡(elevation: ring-accent,独有:头像位 + 居中三行)
+function renderWfAuthor(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-author",
+    `<section style="margin:0 auto 10px;width:48px;height:48px;border-radius:999px;box-shadow:0 0 0 2px ${T.colors.accent};background:${T.colors.accentSoft};display:flex;align-items:center;justify-content:center;color:${T.colors.accent};font-size:18px;font-weight:800;">${escapeHtml(node.fields.name.charAt(0))}</section><p style="margin:0 0 2px;font-size:16px;line-height:1.4;color:${T.colors.text};font-weight:800;text-align:center;">${escapeHtml(node.fields.name)}</p>${node.fields.role ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:${T.colors.accent};font-weight:600;text-align:center;">${escapeHtml(node.fields.role)}</p>` : ""}${node.fields.bio ? `<p style="margin:0;font-size:14px;line-height:1.7;color:${T.colors.muted};text-align:center;">${escapeHtml(node.fields.bio)}</p>` : ""}`,
+    `padding:20px;border-radius:${T.radius.medium};box-shadow:0 0 0 1px ${T.colors.border};text-align:center;`,
+  );
+}
+
 export function renderWriteflowModule(node: AdvancedModuleNode) {
   switch (node.name) {
     case "wf-lead":
@@ -226,6 +310,22 @@ export function renderWriteflowModule(node: AdvancedModuleNode) {
       return renderWfCallout(node);
     case "wf-signoff":
       return renderWfSignoff(node);
+    case "wf-hook":
+      return renderWfHook(node);
+    case "wf-part":
+      return renderWfPart(node);
+    case "wf-divider":
+      return renderWfDivider(node);
+    case "wf-aside":
+      return renderWfAside(node);
+    case "wf-proscons":
+      return renderWfProscons(node);
+    case "wf-stats":
+      return renderWfStats(node);
+    case "wf-case":
+      return renderWfCase(node);
+    case "wf-author":
+      return renderWfAuthor(node);
     default:
       return "";
   }

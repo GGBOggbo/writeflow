@@ -50,6 +50,15 @@ export const WRITEFLOW_MODULE_NAMES = [
   "wf-timeline",
   "wf-callout",
   "wf-signoff",
+  // 批次2:常用模块
+  "wf-hook",
+  "wf-part",
+  "wf-divider",
+  "wf-aside",
+  "wf-proscons",
+  "wf-stats",
+  "wf-case",
+  "wf-author",
 ] as const;
 
 export const ADVANCED_MODULE_NAMES = [
@@ -467,6 +476,59 @@ export const MODULE_DEFS = {
     kind: "fields",
     required: ["body"],
     optional: ["signature"],
+  },
+  // ===== 批次2:常用模块 =====
+  "wf-hook": {
+    usage: "Writeflow 钩子/悬念开场块，用于呈现原文已有的开篇钩子。居中 + 省略号。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label"],
+  },
+  "wf-part": {
+    usage: "Writeflow 大部分割块，用于呈现原文已有的篇章分隔。超大编号 + 粗线。",
+    kind: "fields",
+    required: ["label", "title"],
+    optional: ["subtitle"],
+  },
+  "wf-divider": {
+    usage: "Writeflow 纯视觉分隔块，无文字内容。居中装饰符号。",
+    kind: "fields",
+    required: ["ornament"],
+    optional: [],
+  },
+  "wf-aside": {
+    usage: "Writeflow 旁注/补充说明块，用于呈现原文已有的离题补充。左侧缩进 + 浅底。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label"],
+  },
+  "wf-proscons": {
+    usage: "Writeflow 优缺点对照块，用于呈现原文已有的两面分析。双列 + 顶标签。",
+    kind: "rows",
+    columns: ["side", "item", "detail"],
+    requiredColumns: 2,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-stats": {
+    usage: "Writeflow 多数据并列块，用于呈现原文已有的多个关键数字。圆角大间距卡片。",
+    kind: "rows",
+    columns: ["value", "label", "unit"],
+    requiredColumns: 2,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-case": {
+    usage: "Writeflow 单个案例块，用于呈现原文已有的案例。标题 + 正文 + 结果高亮。",
+    kind: "fields",
+    required: ["title", "body"],
+    optional: ["result"],
+  },
+  "wf-author": {
+    usage: "Writeflow 作者卡块，用于呈现原文已有的作者介绍。居中 + 头像位。",
+    kind: "fields",
+    required: ["name"],
+    optional: ["role", "bio"],
   },
 } as const satisfies Record<AdvancedModuleName, AdvancedModuleDef>;
 

@@ -391,6 +391,109 @@ signature: —— Writeflow
     expect(html).not.toContain("data-mpa-action-id");
   });
 
+  // ===== 批次2:8 个新模块渲染测试 =====
+  it("renders wf-hook as a centered teaser", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-hook
+body: 但真正让读者留下来的，不是花哨的排版
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-hook"');
+    expect(html).toContain("text-align:center");
+    expect(html).toContain("……");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-part with oversized label and top rule", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-part
+label: 第一部分
+title: 先跑通主流程
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-part"');
+    expect(html).toContain("font-size:28px");
+    expect(html).toContain("border-top:2px solid");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-divider as a centered ornament", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-divider
+ornament: star
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-divider"');
+    expect(html).toContain("text-align:center");
+    expect(html).toContain("✦");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-aside as an indented pale block", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-aside
+body: 这是一个补充说明，不属于正文主线。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-aside"');
+    expect(html).toContain("background:");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-proscons as a two-column comparison grid", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-proscons
+优势 | 简单 | 上手快。
+局限 | 死板 | 灵活性低。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-proscons"');
+    expect(html).toContain("grid-template-columns:1fr 1fr");
+    expect(html).toContain("简单");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-stats as a data grid with large numbers", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-stats
+16 | 模块总数 | 个
+568 | 测试数 | 个
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-stats"');
+    expect(html).toContain("grid-template-columns:1fr 1fr");
+    expect(html).toContain("font-size:24px");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-case with title body and accent result box", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-case
+title: 排版重构
+body: 从 10 次推倒重来，改为先定契约再实现。
+result: 模块数 8 → 33，重做次数归零。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-case"');
+    expect(html).toContain("排版重构");
+    expect(html).toContain("box-shadow:0 0 0 1px");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-author as a centered author card", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-author
+name: 张三
+role: 产品设计师
+bio: 专注让复杂的事变简单。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-author"');
+    expect(html).toContain("张三");
+    expect(html).toContain("border-radius:999px");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
   it("uses the shared wechat-native visual contract", () => {
     const html = renderAdvancedModule(parseModule(MODULE_SAMPLES.hero.markdown));
 

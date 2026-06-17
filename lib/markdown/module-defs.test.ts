@@ -10,7 +10,7 @@ import {
 
 describe("MODULE_DEFS", () => {
   it("defines one contract for every supported advanced module", () => {
-    expect(ADVANCED_MODULE_NAMES).toHaveLength(47);
+    expect(ADVANCED_MODULE_NAMES).toHaveLength(55);
     expect(Object.keys(MODULE_DEFS).sort()).toEqual(
       [...ADVANCED_MODULE_NAMES].sort()
     );
@@ -122,6 +122,6 @@ describe("MODULE_DEFS", () => {
     expect(contracts).toContain(
       "dialogue｜对话卡，用于呈现两方以上的问答、讨论或模拟对话。｜对话型｜至少 2 行“角色: 内容”"
     );
-    expect(contracts.split("\n")).toHaveLength(47);
+    expect(contracts.split("\n")).toHaveLength(55);
   });
 });
