@@ -94,7 +94,8 @@ function PrimaryCTA({ label = "免费开始使用" }: { label?: string }) {
   return (
     <Link
       href="/login"
-      className="inline-flex items-center rounded-full bg-[var(--accent-ink)] px-7 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1a2432]"
+      className="inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--accent-ink)] px-7 text-base font-bold leading-none text-[#fff] shadow-[0_10px_24px_rgba(35,48,68,0.18)] transition hover:-translate-y-0.5 hover:bg-[#1a2432] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#5f7993]/25"
+      style={{ color: "#fff" }}
     >
       {label}
     </Link>
