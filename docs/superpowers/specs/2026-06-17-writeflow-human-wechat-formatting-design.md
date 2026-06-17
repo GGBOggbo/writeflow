@@ -11,6 +11,10 @@ argument. Writing quality rules such as title formulas, human voice, case
 strengthening, and growth CTAs belong to drafting or editing specs, not this
 formatting spec.
 
+The system must also stop looking like a 1:1 copy of another formatter. The
+shared idea of Markdown containers is acceptable; copied module names, field
+semantics, HTML structure, class names, and visual styling are not.
+
 ## Scope
 
 The formatter owns presentation:
@@ -127,8 +131,8 @@ Advanced modules are the contract between AI layout orchestration and HTML
 rendering.
 
 The AI formatting step may output a mix of ordinary Markdown and supported
-advanced module fences. The parser turns that into article nodes, and the HTML
-renderer turns those nodes into WeChat-compatible output.
+module fences. The parser turns that into article nodes, and the HTML renderer
+turns those nodes into WeChat-compatible output.
 
 Existing drafts that contain advanced modules must continue to preview and copy
 correctly. This protects user history and keeps the rendering pipeline stable.
@@ -143,9 +147,10 @@ code validates and renders the result.
 
 ## Module Syntax Boundary
 
-The formatter uses the current advanced module syntax as its layout AST.
+The formatter uses module syntax as its layout AST, but the product language
+must become Writeflow's own.
 
-Advanced modules keep their current fence form:
+The fence form can stay because it is a generic Markdown container pattern:
 
 ```md
 :::module-name
@@ -153,18 +158,40 @@ field: value
 :::
 ```
 
-The exact supported module names, fields, and validation rules should continue
-to come from the existing module definitions in code. This spec does not create
-a second module source of truth.
+The module namespace must change.
+
+- New AI formatting output should use Writeflow-owned module names.
+- Writeflow-owned names should use a clear namespace such as `wf-*`.
+- Legacy names such as `hero`, `cards`, `metrics`, `verdict`, and `cta` remain
+  readable for old drafts, but they should not be the prompt language for new
+  formatting.
+- The code module definitions remain the source of truth, but they need to grow
+  a new Writeflow module vocabulary rather than freezing the borrowed one.
+
+Initial Writeflow module vocabulary should be small and reading-rhythm focused:
+
+| Module | Purpose |
+| --- | --- |
+| `wf-lead` | Render an existing opening block or lead judgment. |
+| `wf-section` | Render an existing section transition, index, and heading. |
+| `wf-pullquote` | Render an existing high-value sentence as a pause. |
+| `wf-points` | Render existing parallel points or reasons. |
+| `wf-steps` | Render existing ordered steps or checklist items. |
+| `wf-note` | Render an existing warning, reminder, or side note. |
+| `wf-compare` | Render an existing contrast or before/after comparison. |
+| `wf-image-note` | Render an existing image with caption or explanation. |
+
+This vocabulary is intentionally smaller than the legacy list. It describes
+reading jobs, not web page components.
 
 The AI formatting step may introduce supported `:::` module fences when the
 source content already contains material that fits the module. Examples:
 
-- an existing strong sentence may become a `quote` module;
-- an existing numbered section transition may become a `part` or `label-title`
-  module;
-- existing table-like options may become `cards`, `checklist`, or `specs`;
-- existing images and their explanations may become image modules.
+- an existing strong sentence may become `wf-pullquote`;
+- an existing numbered section transition may become `wf-section`;
+- existing parallel options may become `wf-points`;
+- existing ordered actions may become `wf-steps`;
+- existing images and their explanations may become `wf-image-note`.
 
 Module fields must be traceable to source content. If a field needs compact
 wording, it may be a faithful extraction or light compression of existing text,
@@ -204,6 +231,46 @@ If the source or AI-formatted result contains a valid advanced module, render
 it. If it contains an invalid or unsupported module, degrade it safely or ask
 the AI to retry with validation feedback.
 
+Legacy modules should be treated as an input compatibility layer:
+
+- old drafts render through legacy definitions;
+- new AI prompts do not ask for legacy module names;
+- copied legacy HTML structures should be replaced with Writeflow-owned
+  renderers over time;
+- legacy-to-Writeflow migration can be gradual and should not break saved
+  drafts.
+
+## HTML Style Originality
+
+The WeChat-copy HTML must have Writeflow-owned visual decisions.
+
+Renderer output should avoid copied:
+
+- class names;
+- `data-*` naming schemes;
+- nested section/div structures;
+- inline style recipes;
+- visual card proportions;
+- border/accent treatments;
+- module-specific HTML layouts.
+
+Writeflow renderers should use their own stable attributes, for example
+`data-writeflow-module`, `data-writeflow-version`, and
+`data-writeflow-role`, rather than inherited third-party naming.
+
+The visual style should be restrained and public-account native:
+
+- typography and spacing first;
+- subtle section rhythm instead of web-card density;
+- minimal borders and background blocks;
+- no decorative component look unless the source content truly needs a framed
+  block;
+- WeChat-safe inline CSS with deterministic output.
+
+The goal is not novelty for its own sake. It is a distinct implementation and
+visual language that serves the same public-account reading task without copying
+another project's module system or renderer structure.
+
 ## Prompt Boundary
 
 If an AI formatting prompt is used, it must be framed as a typesetting task:
@@ -213,14 +280,15 @@ If an AI formatting prompt is used, it must be framed as a typesetting task:
 3. Convert the draft into clean Markdown/HTML structure for WeChat reading.
 4. Add or adjust line breaks only at safe punctuation boundaries.
 5. Apply heading, bold, paragraph, and spacing conventions.
-6. Use supported advanced modules when they help the existing content render
-   better in WeChat.
+6. Use supported Writeflow `wf-*` modules when they help the existing content
+   render better in WeChat.
 7. Keep every module field grounded in the source article.
 8. Do not add new headings, openings, endings, examples, or CTAs.
 9. Do not rewrite the article to be more explosive, more human, or more
    commercial.
 10. Preserve protected material-slot tokens exactly once.
-11. Do not introduce unsupported modules or new rhythm DSL blocks.
+11. Do not introduce unsupported modules, legacy module names in new output, or
+    a second rhythm DSL.
 
 If the user wants rewriting, humanization, title optimization, or growth
 strategy, that should be a separate explicit action.
@@ -239,6 +307,8 @@ Code should:
 - validate advanced modules if the source uses them;
 - degrade invalid modules safely to ordinary Markdown/HTML;
 - validate AI-introduced module syntax against the existing module definitions;
+- render new `wf-*` modules with Writeflow-owned HTML structures and inline
+  styles;
 - keep module rendering deterministic and WeChat-compatible;
 - log formatting mode, validation failures, retry reasons, final module names,
   and whether mobile preview validation passed.
@@ -296,11 +366,14 @@ Tests should cover:
 - source sentences are not rewritten;
 - source title, examples, data, identity, and CTA are not invented or removed;
 - existing old modules still render;
-- AI-introduced supported modules render when all fields are grounded in source
+- AI-introduced `wf-*` modules render when all fields are grounded in source
   content;
 - invalid old modules degrade safely;
 - no automatic `hero`, `verdict`, `cta`, ending, or summary module is injected;
+- legacy module names are not requested in new AI formatting prompts;
 - unsupported modules and rhythm DSL blocks are rejected or retried;
+- new module HTML uses Writeflow-owned attributes, structure, and inline style
+  rules rather than copied renderer markup;
 - retry receives concrete validation feedback;
 - fallback does not create new claims or modules.
 
@@ -331,6 +404,8 @@ The feature is successful when the same article content:
 - renders headings, numeric anchors, and bold emphasis cleanly;
 - renders AI-selected supported modules through the existing parser and HTML
   renderer;
+- uses Writeflow-owned module names and HTML style structures for new formatted
+  output;
 - contains no visible Markdown artifacts or broken module fences;
 - preserves the user's wording, facts, order, examples, title, and CTA;
 - still lets older module-based drafts preview and copy correctly.
