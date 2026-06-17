@@ -59,7 +59,7 @@ export function buildMarkdownDraftPrompt(
       "=== Writeflow 模块语法 ===",
       "使用 :::wf-module-name 开始，::: 结束。",
       "普通正文仍用 Markdown。模块只用来安排已有内容的阅读节奏。",
-      "允许模块：wf-lead、wf-section、wf-pullquote、wf-points、wf-steps、wf-note、wf-compare、wf-image-note、wf-toc、wf-quote、wf-highlight、wf-faq、wf-metric、wf-timeline、wf-callout、wf-signoff、wf-hook、wf-part、wf-divider、wf-aside、wf-proscons、wf-stats、wf-case、wf-author、wf-checklist、wf-question、wf-prompt、wf-quote-evidence、wf-source、wf-people、wf-gallery、wf-stats-grid、wf-recap。",
+      "允许模块：" + WRITEFLOW_MODULE_NAMES.join("、") + "。",
       "不要使用 hero、cards、metrics、verdict、cta 等 legacy 模块名。",
       "",
       "=== 阅读续读目标 ===",
