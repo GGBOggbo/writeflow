@@ -16,6 +16,7 @@ formatting spec.
 The formatter owns presentation:
 
 - Markdown-to-HTML conversion;
+- AI-produced module syntax as the intermediate layout contract;
 - WeChat-compatible inline styles;
 - mobile reading density;
 - paragraph spacing and line breaks;
@@ -80,6 +81,8 @@ Allowed changes:
 - converting Markdown emphasis to HTML emphasis;
 - converting Markdown headings to styled text;
 - converting supported advanced modules to deterministic HTML;
+- wrapping existing content in supported advanced modules when that module only
+  changes presentation;
 - normalizing paragraph wrappers, spacing, and inline styles;
 - splitting an existing dense paragraph only at safe punctuation boundaries when
   the sentences remain unchanged and in the same order;
@@ -120,22 +123,29 @@ them belongs to a separate editing or humanization pass.
 
 ## Advanced Module Compatibility
 
-Existing drafts that contain old advanced modules must continue to preview and
-copy correctly. This avoids breaking user history and keeps the migration small.
+Advanced modules are the contract between AI layout orchestration and HTML
+rendering.
 
-New human-wechat formatting should prefer ordinary Markdown and WeChat-style
-HTML over card-heavy web components. The old module list remains a compatibility
-layer, not the future product language.
+The AI formatting step may output a mix of ordinary Markdown and supported
+advanced module fences. The parser turns that into article nodes, and the HTML
+renderer turns those nodes into WeChat-compatible output.
+
+Existing drafts that contain advanced modules must continue to preview and copy
+correctly. This protects user history and keeps the rendering pipeline stable.
+
+The key boundary is content preservation. A module may re-present content that
+already exists in the article, but it must not become a way to add missing
+claims, examples, endings, CTAs, identities, numbers, or conclusions.
 
 Code should not inject `hero`, `verdict`, `cta`, or summary modules after the AI
-returns. It should render what exists, validate what exists, and fail safely
-when unsupported module syntax appears.
+returns. The AI may select supported modules during the formatting step, then
+code validates and renders the result.
 
 ## Module Syntax Boundary
 
-The formatter supports module syntax only as compatibility syntax.
+The formatter uses the current advanced module syntax as its layout AST.
 
-Existing advanced modules keep their current fence form:
+Advanced modules keep their current fence form:
 
 ```md
 :::module-name
@@ -147,8 +157,21 @@ The exact supported module names, fields, and validation rules should continue
 to come from the existing module definitions in code. This spec does not create
 a second module source of truth.
 
-Formatting-only output should not introduce new module fences. In particular,
-the formatter should not generate new rhythm DSL blocks such as:
+The AI formatting step may introduce supported `:::` module fences when the
+source content already contains material that fits the module. Examples:
+
+- an existing strong sentence may become a `quote` module;
+- an existing numbered section transition may become a `part` or `label-title`
+  module;
+- existing table-like options may become `cards`, `checklist`, or `specs`;
+- existing images and their explanations may become image modules.
+
+Module fields must be traceable to source content. If a field needs compact
+wording, it may be a faithful extraction or light compression of existing text,
+but it must not introduce a new claim.
+
+The formatter must not create a new rhythm DSL. In particular, it should not
+generate blocks such as:
 
 ```md
 ::opening
@@ -174,9 +197,12 @@ For new formatted output, the preferred structure is ordinary Markdown:
 **已有重点句。**
 ```
 
-If the source already contains a valid advanced module, render it. If the source
-contains an invalid or unsupported module, degrade it safely. If the source
-contains no module, do not add one.
+Ordinary Markdown remains valid output. Modules are optional layout tools, not a
+quota.
+
+If the source or AI-formatted result contains a valid advanced module, render
+it. If it contains an invalid or unsupported module, degrade it safely or ask
+the AI to retry with validation feedback.
 
 ## Prompt Boundary
 
@@ -187,11 +213,14 @@ If an AI formatting prompt is used, it must be framed as a typesetting task:
 3. Convert the draft into clean Markdown/HTML structure for WeChat reading.
 4. Add or adjust line breaks only at safe punctuation boundaries.
 5. Apply heading, bold, paragraph, and spacing conventions.
-6. Do not add new headings, openings, endings, examples, or CTAs.
-7. Do not rewrite the article to be more explosive, more human, or more
+6. Use supported advanced modules when they help the existing content render
+   better in WeChat.
+7. Keep every module field grounded in the source article.
+8. Do not add new headings, openings, endings, examples, or CTAs.
+9. Do not rewrite the article to be more explosive, more human, or more
    commercial.
-8. Preserve protected material-slot tokens exactly once.
-9. Do not introduce new advanced modules or new rhythm DSL blocks.
+10. Preserve protected material-slot tokens exactly once.
+11. Do not introduce unsupported modules or new rhythm DSL blocks.
 
 If the user wants rewriting, humanization, title optimization, or growth
 strategy, that should be a separate explicit action.
@@ -209,7 +238,8 @@ Code should:
 - preserve protected placeholders intact;
 - validate advanced modules if the source uses them;
 - degrade invalid modules safely to ordinary Markdown/HTML;
-- avoid introducing new module syntax during formatting-only actions;
+- validate AI-introduced module syntax against the existing module definitions;
+- keep module rendering deterministic and WeChat-compatible;
 - log formatting mode, validation failures, retry reasons, final module names,
   and whether mobile preview validation passed.
 
@@ -266,9 +296,11 @@ Tests should cover:
 - source sentences are not rewritten;
 - source title, examples, data, identity, and CTA are not invented or removed;
 - existing old modules still render;
+- AI-introduced supported modules render when all fields are grounded in source
+  content;
 - invalid old modules degrade safely;
 - no automatic `hero`, `verdict`, `cta`, ending, or summary module is injected;
-- no new module fence or rhythm DSL block is generated when the source has none;
+- unsupported modules and rhythm DSL blocks are rejected or retried;
 - retry receives concrete validation feedback;
 - fallback does not create new claims or modules.
 
@@ -297,6 +329,8 @@ The feature is successful when the same article content:
 - uses readable font size, line height, justified text, and left/right side
   inset;
 - renders headings, numeric anchors, and bold emphasis cleanly;
+- renders AI-selected supported modules through the existing parser and HTML
+  renderer;
 - contains no visible Markdown artifacts or broken module fences;
 - preserves the user's wording, facts, order, examples, title, and CTA;
 - still lets older module-based drafts preview and copy correctly.
