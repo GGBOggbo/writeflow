@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ADVANCED_MODULE_NAMES } from "@/lib/markdown/advanced-modules";
+import { LEGACY_ADVANCED_MODULE_NAMES } from "@/lib/markdown/module-defs";
 import { renderExtendedMarkdown } from "./render-extended-markdown";
 
 const fixture = readFileSync(
@@ -9,15 +9,35 @@ const fixture = readFileSync(
 );
 
 describe("renderExtendedMarkdown", () => {
-  it("renders all 31 modules inside one wechat-native article root", () => {
+  it("renders all legacy modules inside one writeflow editorial article root", () => {
     const html = renderExtendedMarkdown(fixture);
     const ids = [...html.matchAll(/data-mpa-action-id="([^"]+)"/g)]
       .map((match) => match[1])
       .filter((id) => !id.startsWith("faq_"));
 
-    expect(new Set(ids)).toEqual(new Set(ADVANCED_MODULE_NAMES));
-    expect(html.match(/data-wechat-theme="wechat-native"/g)).toHaveLength(1);
+    expect(new Set(ids)).toEqual(new Set(LEGACY_ADVANCED_MODULE_NAMES));
+    expect(html.match(/data-wechat-theme="writeflow-editorial"/g)).toHaveLength(
+      1
+    );
     expect(html).not.toContain(":::");
+  });
+
+  it("renders wf modules inside a writeflow editorial article root", () => {
+    const html = renderExtendedMarkdown(`正文开头。
+
+:::wf-section
+index: 01
+title: 先跑通主流程
+:::
+
+:::wf-pullquote
+quote: 预览好看不算完成，粘贴不塌才算完成。
+:::`);
+
+    expect(html).toContain('data-wechat-theme="writeflow-editorial"');
+    expect(html).toContain('data-writeflow-module="wf-section"');
+    expect(html).toContain("预览好看不算完成");
+    expect(html).not.toContain("data-mpa-action-id");
   });
 
   it("keeps ordinary Markdown in source order around advanced modules", () => {

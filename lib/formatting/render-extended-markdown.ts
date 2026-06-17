@@ -6,7 +6,7 @@ import {
 import { renderSafeGfm, type GfmTagStyleMap } from "@/lib/markdown/render";
 import { renderAdvancedModule } from "./advanced-module-render";
 import {
-  WECHAT_NATIVE_TOKENS as DEFAULT_TOKENS,
+  WRITEFLOW_EDITORIAL_TOKENS as DEFAULT_TOKENS,
   getFormatTokens,
   setFormatTokens,
   resetFormatTokens,
@@ -129,7 +129,7 @@ export function renderExtendedMarkdown(markdown: string, tokens?: FormatTokens) 
     ? `<section class="footnotes" style="margin-top:32px;padding-top:12px;border-top:1px solid ${T.colors.border};font-family:${T.font};color:${T.colors.muted};font-size:13px;"><ol style="margin:0;padding-left:22px;">${[...collectedFootnotes.values()].join("")}</ol></section>`
     : "";
 
-  const themeId: string = tokens === undefined ? "wechat-native" : "claude";
+  const themeId: string = tokens === undefined ? "writeflow-editorial" : "custom";
   const article = `<article data-wechat-theme="${themeId}" style="width:100%;max-width:680px;margin:0 auto;padding:12px 16px 36px;box-sizing:border-box;background:${T.colors.surface};color:${T.colors.text};font-family:${T.font};word-break:break-word;overflow-wrap:anywhere;">${content}${footnoteHtml}</article>`;
   resetFormatTokens();
   return article;
