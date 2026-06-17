@@ -22,6 +22,11 @@ This first version does not expose a large mode selector. The visible user
 promise remains simple: AI helps turn a draft into a clean, readable WeChat
 article.
 
+The mode is a general Writeflow public-account mode. Account-specific openings
+such as a fixed Jintian intro must come from the current IP persona, account
+template, or workflow context. They must not be hard-coded into every user's
+article.
+
 ## Reader Experience
 
 The formatted article should feel like a person guiding the reader through an
@@ -29,19 +34,33 @@ argument on a phone screen.
 
 - Body font targets 15-17px in preview and WeChat-compatible output.
 - Line height targets 1.6.
+- Final article length targets 1000-1500 Chinese characters, with a hard upper
+  bound of 1800 unless the user explicitly asks for a long article.
 - Paragraphs use high-frequency line breaks. The default rhythm is one sentence
   or one core beat per paragraph.
 - Two short sentences may stay together only when they clearly belong to the
   same emotional beat and read better as one breath.
 - Dense paragraphs are split aggressively to create mobile breathing room.
-- Paragraph rendering targets justified text and a 1.6 text indent where the
-  output surface supports those controls.
+- Paragraph rendering must apply justified text, 1.6 line height, and 1.6
+  character left/right side inset in the managed preview and WeChat-copy output.
+  If a non-WeChat target cannot support these controls, the limitation must be
+  surfaced instead of treating the output as fully ready.
+- The 1.6 side inset means left and right paragraph spacing. It is not a
+  first-line text indent.
 - Sections use two-digit Arabic anchors: `01`, `02`, `03`.
 - The number stands on its own line, followed by a fully bold heading on the
   next line.
-- Bold is reserved for core judgments, high-energy lines, and scan anchors.
-- The ending uses `写在最后` or `写在最后的话：` as a standalone line, followed
-  by a concise closing judgment.
+- Section heading text must be fully bolded from beginning to end.
+- The article title must be bolded in preview/copy output when the title is
+  included in the formatted article. It should not use a subtitle unless the
+  user explicitly provides one.
+- Bold inside the body is reserved for core judgments, high-energy lines, and
+  scan anchors.
+- The ending either uses the exact standalone line `写在最后的话：` followed by
+  a strong closing line, or closes directly with a strong final judgment. It
+  must not use `写在最后` without the colon format.
+- The final closing line should be a screenshot-worthy sentence: concrete,
+  memorable, and emotionally resonant.
 - Covers are not generated in this scope, but prompts should favor clear,
   stable, real-looking cover directions over decorative design language when a
   cover prompt is involved later.
@@ -53,9 +72,12 @@ decoration.
 
 The default human-wechat rule is:
 
-- do not use double quotation marks in generated editorial prose;
-- avoid Markdown separators such as `---`, `___`, and `***`;
-- avoid decorative stars, emoji, ornamental dividers, and special-symbol
+- do not use any double quotation marks in final public-article output,
+  including straight quotes and Chinese curly quotes;
+- forbid all horizontal divider lines and divider-like constructs, including
+  but not limited to `---`, `___`, `***`, long dashes, repeated symbols, and
+  visual separator rows;
+- forbid decorative stars, emoji, ornamental symbols, and special-symbol
   framing;
 - never show visible stars or Markdown syntax such as `**` in final HTML;
 - keep punctuation clean and conversational.
@@ -63,10 +85,28 @@ The default human-wechat rule is:
 Markdown stars may exist only as internal authoring syntax for bold. They must
 be converted before preview/copy output.
 
-This is a strict style rule for generated prose. If a protected source title,
-regulation, code fragment, or user-provided exact text truly requires quotation
-marks, the system may preserve that protected text. Otherwise, the AI should
-transform quoted claims into natural first-person or third-person phrasing.
+This is a strict style rule for the final article. Source titles, dialogue,
+concepts, and quoted claims should be transformed into narrative expression
+instead of preserving double quotation marks. If an exact user-provided legal or
+code fragment cannot be safely transformed, the formatter should fail validation
+and ask for user confirmation rather than silently publishing a rule-breaking
+article.
+
+## Human Voice And Banlist
+
+The highest writing principle is `说人话`: the article should sound like a real
+person talking to a reader, with concrete scenes, emotions, actions, and
+observable details.
+
+The human-wechat mode must inherit the existing machine-word ban policy and
+must be able to use the complete knowledge-base banlist as its canonical source.
+The current baseline includes words and phrases such as `首先`, `其次`, `然而`,
+`此外`, `综上所述`, `总之`, `因此`, `例如`, `基于此`, `显而易见`, `值得注意的是`,
+`不可否认`, `换句话说`, `尽管如此`, `由此可见`, and `简而言之`.
+
+Implementation must not hard-code only this shorter baseline if the 65-word
+knowledge-base list is available. The full list should live in one reusable
+policy source so prompts, validators, and tests use the same truth.
 
 ## Editorial Rhythm Model
 
@@ -80,7 +120,7 @@ The preferred rhythm vocabulary is:
 - `金句停顿`: bold a small number of high-value judgments;
 - `证据 / 对比`: keep cases, examples, data, and contrast in normal prose unless
   a compact block clearly improves comprehension;
-- `写在最后`: close with a summary judgment that leaves a residue.
+- `写在最后的话：`: close with a strong golden sentence that leaves a residue.
 
 The old module vocabulary such as `hero`, `cards`, `metrics`, `verdict`, and
 `cta` may remain supported by the parser and renderer for existing drafts. New
@@ -100,6 +140,9 @@ should prefer concrete public-account title patterns:
 - counterintuitive judgment;
 - useful keywords such as AI, money, traffic, account growth, or workflow when
   they are truly relevant to the article.
+- emotionally full, conflict-driven phrasing without a subtitle.
+
+When the title is included in the formatted article, it must be fully bolded.
 
 For openings, the strongest pattern is:
 
@@ -107,9 +150,14 @@ For openings, the strongest pattern is:
 - user pain;
 - measurable or concrete result.
 
-The AI may strengthen these elements only when they are present in the source
-or known workflow context. It must not invent experience counts, revenue,
-timelines, credentials, or guaranteed outcomes.
+The opening should also include a real persona touch when available: personal
+case, student case, observed scene, or a concrete moment that lets the reader
+feel the writer has actually been there.
+
+The AI may strengthen these elements only when they are present in the source,
+material slots, persona template, search material, or known workflow context. It
+must not invent experience counts, revenue, timelines, credentials, student
+cases, or guaranteed outcomes.
 
 For body sections, each major point should prefer this structure when the source
 supports it:
@@ -123,10 +171,31 @@ Cases, numbers, and methods should be promoted from source material, search
 material, or user-provided context. They must not be fabricated for the sake of
 looking like a high-conversion article.
 
-For endings, `写在最后` is the default emotional close. If the article has a
-business goal and source-supported call to action, the ending may include a
-restrained conversion line such as follow, save, share, comment, or private
-domain guidance. It must not create a new CTA that the user did not imply.
+Cases should be specific rather than decorative. Prefer details such as scene,
+time, who acted, what changed, what the person felt, what number moved, or what
+decision followed. Personal or student cases are preferred when the source
+supports them.
+
+For completion-rate guidance, the article may include a natural reader-retention
+line only when it fits the content, such as telling the reader that the final
+method or checklist is important. This should not become a repetitive template.
+
+For endings, the preferred label is exactly `写在最后的话：`. The article may
+also close directly with a strong final judgment when a label would feel stiff.
+It must not use `写在最后` without the full colon format.
+
+If the article has a business goal and source-supported call to action, the
+ending may include a restrained conversion line such as follow, save, share,
+comment, or private domain guidance. It must not create a new CTA that the user
+did not imply.
+
+Sharing or forwarding guidance should be included when the article has a
+public-account growth goal and the source supports it. The final line should be
+a strong golden sentence, not a generic summary.
+
+When image support is part of the workflow, the article should prefer real
+scene photos, screenshots, data screenshots, or other believable evidence
+images over decorative illustrations.
 
 ## Prompt Responsibilities
 
@@ -140,16 +209,21 @@ The draft-formatting prompt must instruct the AI to:
    multiple logical parts.
 5. Keep headings short, concrete, and fully bold.
 6. Split dense paragraphs into breathable units without making the text choppy.
-7. Bold only a few core judgments or high-energy lines.
-8. Use `写在最后` or `写在最后的话：` only when the source supports a real closing.
-9. Avoid decorative symbols, markdown dividers, visible markdown artifacts, and
+7. Bold the title and every section heading fully when they appear in the
+   formatted article.
+8. Bold only a few core judgments or high-energy lines inside body prose.
+9. Use the exact `写在最后的话：` label only when the source supports a real
+   closing, or close directly with a strong final judgment.
+10. Avoid decorative symbols, markdown dividers, visible markdown artifacts, and
    forced visual variety.
-10. Avoid inventing new facts, cases, numbers, promises, positions, or calls to
+11. Avoid inventing new facts, cases, numbers, promises, positions, or calls to
     action.
-11. Preserve protected material-slot tokens exactly once.
-12. Promote source-supported identity, pain, result, cases, theory backing,
+12. Preserve protected material-slot tokens exactly once.
+13. Promote source-supported identity, pain, result, cases, theory backing,
     practical methods, and CTA when the article already contains or implies
     them.
+14. Apply the machine-word banlist and transform stiff logical connectors into
+    questions, actions, scenes, or spoken transitions.
 
 The prompt should describe the output as a finished WeChat article, not as a DSL
 exercise. Advanced modules are allowed only when they serve a clear reading job
@@ -165,13 +239,16 @@ It should:
 - render ordinary Markdown into clean WeChat-compatible HTML;
 - ensure bold markers become HTML emphasis and never remain visible syntax;
 - support the `01` plus bold heading rhythm without requiring a special module;
-- support justified paragraph rendering and 1.6 text indent where the output
-  target allows it;
+- support justified paragraph rendering and 1.6 character left/right side inset
+  in managed preview and WeChat-copy HTML;
+- avoid first-line indentation unless a future mode explicitly requires it;
 - keep protected placeholders intact;
 - validate advanced modules if the AI uses them;
 - degrade invalid modules safely to ordinary Markdown;
-- log formatting mode, validation failures, retry reasons, and final module
-  names.
+- reject final output that contains double quotation marks, visible divider
+  rows, visible Markdown stars, or banned machine words;
+- log formatting mode, validation failures, retry reasons, final module names,
+  and whether mobile preview validation passed.
 
 Code should not:
 
@@ -195,7 +272,9 @@ behind the same mode boundary and should not be required for this first version.
 ## Failure Behavior
 
 1. Validate the first AI result for placeholders, truncation, basic Markdown
-   structure, module contracts, and forbidden visible artifacts.
+   structure, module contracts, forbidden visible artifacts, machine-word
+   banlist violations, length, title/heading bolding, ending format, and mobile
+   reading parameters.
 2. Retry once with concrete validation feedback.
 3. If both AI attempts fail, return a conservative local fallback.
 4. The fallback may split paragraphs, preserve headings, and keep existing bold
@@ -211,14 +290,23 @@ Tests should cover:
 - dense paragraphs are split without changing claims;
 - high-frequency line breaks are preferred over dense multi-sentence blocks;
 - `01` / bold heading rhythm survives Markdown-to-HTML rendering;
+- title and section headings are fully bolded;
 - visible Markdown stars do not appear in rendered HTML;
 - generated prose avoids double quotation marks, decorative separators, visible
   stars, and ornamental symbols;
-- all separator variants such as `---`, `___`, and `***` are rejected or
-  cleaned;
-- justified text and 1.6 indent are applied where the renderer supports them;
+- all divider lines and divider-like constructs are rejected or cleaned;
+- justified text and 1.6 left/right side inset are applied in managed preview
+  and WeChat-copy HTML;
+- the formatter does not confuse side inset with first-line indentation;
+- final length targets 1000-1500 Chinese characters and rejects output above
+  1800 unless explicitly requested;
+- baseline machine words are rejected, and the implementation is ready to use
+  the complete knowledge-base banlist;
 - source-supported title, opening identity, cases, methods, and CTA are
   preserved or promoted;
+- opening persona touch, concrete case details, completion guidance, real-image
+  guidance, sharing guidance, and golden-sentence ending are used when
+  source-supported;
 - unsupported identity, results, cases, and CTA are not invented;
 - protected placeholders are preserved exactly once;
 - existing old modules still render;
@@ -226,6 +314,16 @@ Tests should cover:
 - no automatic `hero`, `verdict`, or `cta` is injected;
 - retry receives concrete validation feedback;
 - fallback does not create new claims or modules.
+
+## Preview Validation
+
+The workflow must include a mobile preview check before the result is considered
+ready. The check should verify reading density, title/heading bolding, line
+break rhythm, visible Markdown artifacts, forbidden symbols, divider lines,
+side inset, line height, and obvious overflow or spacing problems.
+
+This can begin as deterministic HTML/CSS validation and should later be paired
+with browser screenshot review for representative mobile widths.
 
 ## Out Of Scope
 
@@ -236,6 +334,7 @@ Tests should cover:
 - WeChat editor clipboard automation;
 - visual redesign of every old advanced module;
 - rewriting the whole draft pipeline in one pass.
+- hard-coding one creator's fixed intro into all users' articles.
 
 ## Acceptance Criteria
 
@@ -244,9 +343,15 @@ The feature is successful when a newly formatted draft:
 - reads like a finished WeChat public-account article on mobile;
 - uses high-frequency, breathable paragraphs without becoming fragmented;
 - uses numbered anchors and restrained bolding when structure supports them;
-- avoids visible Markdown artifacts and cheap decorative symbols;
-- applies justified text and 1.6 indent where the renderer supports them;
+- uses a bold title and fully bold section headings when present;
+- avoids double quotation marks, visible Markdown artifacts, divider lines, and
+  cheap decorative symbols;
+- applies justified text and 1.6 left/right side inset in managed preview and
+  WeChat-copy HTML;
+- stays in the 1000-1500 character target range unless the user asks otherwise;
 - promotes source-supported title, opening trust, cases, methods, and CTA;
+- includes human voice, concrete case detail, sharing guidance, and a strong
+  final golden sentence when the source supports them;
 - refuses to invent unsupported identity, data, outcomes, cases, or conversion
   promises;
 - preserves the user's factual content and point of view;
