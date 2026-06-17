@@ -59,6 +59,16 @@ export const WRITEFLOW_MODULE_NAMES = [
   "wf-stats",
   "wf-case",
   "wf-author",
+  // 批次3:补充模块(凑够 33)
+  "wf-checklist",
+  "wf-question",
+  "wf-prompt",
+  "wf-quote-evidence",
+  "wf-source",
+  "wf-people",
+  "wf-gallery",
+  "wf-stats-grid",
+  "wf-recap",
 ] as const;
 
 export const ADVANCED_MODULE_NAMES = [
@@ -529,6 +539,69 @@ export const MODULE_DEFS = {
     kind: "fields",
     required: ["name"],
     optional: ["role", "bio"],
+  },
+  // ===== 批次3:补充模块(凑够 33) =====
+  "wf-checklist": {
+    usage: "Writeflow 清单/核对项块，用于呈现原文已有的待办或核对列表。勾选符号 + 列表。",
+    kind: "rows",
+    columns: ["item", "checked", "note"],
+    requiredColumns: 2,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-question": {
+    usage: "Writeflow 向读者提问块，用于呈现原文已有的反问或思考题。居中问号锚。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["hint"],
+  },
+  "wf-prompt": {
+    usage: "Writeflow 温和行动提示块，用于呈现原文已有的轻量行动建议（非 CTA）。柔和提示框。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label"],
+  },
+  "wf-quote-evidence": {
+    usage: "Writeflow 证据引用块，用于呈现原文已有的用户/专家原话。引号 + 出处 + 角色。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["source", "role"],
+  },
+  "wf-source": {
+    usage: "Writeflow 来源标注卡，用于呈现原文已有的资料来源。标题 + 出版方 + 链接。",
+    kind: "fields",
+    required: ["title"],
+    optional: ["publisher", "url"],
+  },
+  "wf-people": {
+    usage: "Writeflow 多人物简介块，用于呈现原文已有多位人物。每行一人。",
+    kind: "rows",
+    columns: ["name", "role", "note"],
+    requiredColumns: 1,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-gallery": {
+    usage: "Writeflow 多图并排块，用于呈现原文已有的多张图片。src + caption。",
+    kind: "rows",
+    columns: ["src", "caption"],
+    requiredColumns: 1,
+    maxColumns: 2,
+    minRows: 2,
+  },
+  "wf-stats-grid": {
+    usage: "Writeflow 四宫格数据指标卡，用于呈现原文已有的多个关键指标（比 wf-stats 更紧凑）。",
+    kind: "rows",
+    columns: ["value", "label", "unit"],
+    requiredColumns: 2,
+    maxColumns: 3,
+    minRows: 2,
+  },
+  "wf-recap": {
+    usage: "Writeflow 回顾小结盒，用于呈现原文已有的阶段性回顾。带编号回顾。",
+    kind: "fields",
+    required: ["body"],
+    optional: ["label", "count"],
   },
 } as const satisfies Record<AdvancedModuleName, AdvancedModuleDef>;
 

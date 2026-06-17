@@ -494,6 +494,121 @@ bio: 专注让复杂的事变简单。
     expect(html).not.toContain("data-mpa-action-id");
   });
 
+  // ===== 批次3:9 个新模块渲染测试 =====
+  it("renders wf-checklist with check marks", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-checklist
+确认主流程 | ✓ | 跑通用户路径。
+验证复制效果 | ✗ | 还没测。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-checklist"');
+    expect(html).toContain("✓");
+    expect(html).toContain("✗");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-question with centered question mark anchor", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-question
+body: 你的读者真的愿意读完吗？
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-question"');
+    expect(html).toContain("font-size:28px");
+    expect(html).toContain("text-align:center");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-prompt as a soft dashed prompt box", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-prompt
+body: 试着把这段话发给你的读者看看。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-prompt"');
+    expect(html).toContain("dashed");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-quote-evidence with big quote mark and role", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-quote-evidence
+body: 这是我用过最顺的排版。
+source: 用户反馈
+role: 资深作者
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-quote-evidence"');
+    expect(html).toContain("资深作者");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-source as a citation card with left rule", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-source
+title: 公众号排版手册
+publisher: Writeflow
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-source"');
+    expect(html).toContain("公众号排版手册");
+    expect(html).toContain("border-left:3px solid");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-people as rows with initial circles", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-people
+张三 | 作者 | 写了主体内容。
+李四 | 编辑 | 负责校对。
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-people"');
+    expect(html).toContain("张三");
+    expect(html).toContain("border-radius:999px");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-gallery as a two-column image grid", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-gallery
+https://example.com/a.png | 图一
+https://example.com/b.png | 图二
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-gallery"');
+    expect(html).toContain("grid-template-columns:1fr 1fr");
+    expect(html).toContain("example.com/a.png");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-stats-grid as a compact four-cell grid", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-stats-grid
+33 | 模块 | 个
+576 | 测试 | 个
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-stats-grid"');
+    expect(html).toContain("grid-template-columns:1fr 1fr");
+    expect(html).toContain("font-size:20px");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
+  it("renders wf-recap as a pale recap box with count", () => {
+    const html = renderAdvancedModule(
+      parseModule(`:::wf-recap
+body: 我们从 8 个模块扩展到 33 个，每个都有独有视觉签名。
+count: 三批次
+:::`)
+    );
+    expect(html).toContain('data-writeflow-module="wf-recap"');
+    expect(html).toContain("三批次");
+    expect(html).toContain("box-shadow:0 0 0 1px");
+    expect(html).not.toContain("data-mpa-action-id");
+  });
+
   it("uses the shared wechat-native visual contract", () => {
     const html = renderAdvancedModule(parseModule(MODULE_SAMPLES.hero.markdown));
 

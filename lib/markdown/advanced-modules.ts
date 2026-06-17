@@ -31,6 +31,10 @@ const ROW_MODULES = new Set<AdvancedModuleName>([
   "wf-timeline",
   "wf-proscons",
   "wf-stats",
+  "wf-checklist",
+  "wf-people",
+  "wf-gallery",
+  "wf-stats-grid",
 ]);
 
 const SPECIAL_MODULES = new Set<AdvancedModuleName>([

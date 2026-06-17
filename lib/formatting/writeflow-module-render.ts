@@ -276,6 +276,104 @@ function renderWfAuthor(node: AdvancedModuleNode) {
   );
 }
 
+// ===== 批次3:补充模块渲染器(凑够 33) =====
+
+// wf-checklist: 勾选符号 + 列表(elevation: flat,独有:✓/✗ 符号锚 + 缩进)
+function renderWfChecklist(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const rows = node.rows
+    .map(([item = "", checked = "", note = ""]) => {
+      const isChecked = checked.includes("✓") || checked.includes("是") || checked.toLowerCase().includes("y");
+      const mark = isChecked ? "✓" : "✗";
+      const markColor = isChecked ? T.colors.accent : T.colors.muted;
+      return `<section style="box-sizing:border-box;margin:0 0 10px;padding:6px 0;border-bottom:1px solid ${T.colors.border};"><p style="margin:0;font-size:15px;line-height:1.6;color:${T.colors.text};"><span style="display:inline-block;width:20px;color:${markColor};font-weight:800;">${mark}</span>${escapeHtml(item)}</p>${note ? `<p style="margin:3px 0 0 20px;font-size:13px;line-height:1.6;color:${T.colors.muted};">${escapeHtml(note)}</p>` : ""}</section>`;
+    })
+    .join("");
+  return root("wf-checklist", rows);
+}
+
+// wf-question: 居中问号锚(elevation: flat,独有:居中 ? 符号 + 反问)
+function renderWfQuestion(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-question",
+    `<p style="margin:0 0 8px;font-size:28px;line-height:1;color:${T.colors.accent};font-weight:800;text-align:center;">?</p><p style="margin:0;font-size:17px;line-height:1.7;color:${T.colors.text};font-weight:700;text-align:center;">${escapeHtml(node.fields.body)}</p>${node.fields.hint ? `<p style="margin:10px 0 0;font-size:13px;line-height:1.6;color:${T.colors.muted};text-align:center;">${escapeHtml(node.fields.hint)}</p>` : ""}`,
+    `padding:18px 0;text-align:center;`,
+  );
+}
+
+// wf-prompt: 柔和提示框(elevation: ring,独有:虚线边框,区别 note/callout 的实色)
+function renderWfPrompt(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-prompt",
+    `${label(node.fields.label)}<p style="margin:0;font-size:15px;line-height:1.8;color:${T.colors.text};">${escapeHtml(node.fields.body)}</p>`,
+    `padding:14px 16px;border:1px dashed ${T.colors.border};border-radius:${T.radius.medium};background:${T.colors.accentPale};`,
+  );
+}
+
+// wf-quote-evidence: 引号 + 出处 + 角色(elevation: flat,独有:大引号装饰 + 角色标签)
+function renderWfQuoteEvidence(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-quote-evidence",
+    `<p style="margin:0 0 4px;font-size:28px;line-height:1;color:${T.colors.accent};font-weight:800;">"</p><p style="margin:0 0 10px;font-size:15px;line-height:1.8;color:${T.colors.text};">${escapeHtml(node.fields.body)}</p>${node.fields.source || node.fields.role ? `<p style="margin:0;font-size:13px;line-height:1.6;color:${T.colors.muted};">${node.fields.role ? `<span style="color:${T.colors.accent};font-weight:600;">${escapeHtml(node.fields.role)}</span>${node.fields.source ? " · " : ""}` : ""}${node.fields.source ? escapeHtml(node.fields.source) : ""}</p>` : ""}`,
+  );
+}
+
+// wf-source: 来源标注卡(elevation: ring,独有:左竖线 + 链接样式)
+function renderWfSource(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-source",
+    `<p style="margin:0 0 4px;font-size:14px;line-height:1.5;color:${T.colors.text};font-weight:700;">${escapeHtml(node.fields.title)}</p>${node.fields.publisher ? `<p style="margin:0 0 4px;font-size:13px;line-height:1.5;color:${T.colors.muted};">${escapeHtml(node.fields.publisher)}</p>` : ""}${node.fields.url ? `<p style="margin:0;font-size:12px;line-height:1.5;color:${T.colors.accent};word-break:break-all;">${escapeHtml(node.fields.url)}</p>` : ""}`,
+    `padding:12px 14px;border-left:3px solid ${T.colors.border};background:${T.colors.accentPale};border-radius:${T.radius.small};`,
+  );
+}
+
+// wf-people: 多人物行(elevation: flat,独有:首字母圆 + 行式堆叠)
+function renderWfPeople(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const rows = node.rows
+    .map(([name = "", role = "", note = ""]) =>
+      `<section style="box-sizing:border-box;margin:0 0 12px;display:flex;align-items:flex-start;gap:10px;"><span style="flex-shrink:0;width:32px;height:32px;border-radius:999px;background:${T.colors.accentSoft};color:${T.colors.accent};font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;">${escapeHtml(name.charAt(0))}</span><section style="flex:1;"><p style="margin:0 0 2px;font-size:15px;line-height:1.4;color:${T.colors.text};font-weight:700;">${escapeHtml(name)}${role ? `<span style="font-size:12px;color:${T.colors.muted};font-weight:400;margin-left:6px;">${escapeHtml(role)}</span>` : ""}</p>${note ? `<p style="margin:0;font-size:13px;line-height:1.6;color:${T.colors.muted};">${escapeHtml(note)}</p>` : ""}</section></section>`,
+    )
+    .join("");
+  return root("wf-people", rows);
+}
+
+// wf-gallery: 多图并排(elevation: flat,独有:两列图网格)
+function renderWfGallery(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const cells = node.rows
+    .map(([src = "", caption = ""]) =>
+      `<section style="box-sizing:border-box;"><img src="${escapeHtml(src)}" alt="${escapeHtml(caption)}" style="display:block;width:100%;height:auto;border-radius:${T.radius.medium};" />${caption ? `<p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:${T.colors.muted};text-align:center;">${escapeHtml(caption)}</p>` : ""}</section>`,
+    )
+    .join("");
+  return root("wf-gallery", `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:10px;">${cells}</section>`);
+}
+
+// wf-stats-grid: 四宫格数据(比 wf-stats 更紧凑,elevation: ring + 间距)
+function renderWfStatsGrid(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const cells = node.rows
+    .map(([value = "", label = "", unit = ""]) =>
+      `<section style="box-sizing:border-box;padding:12px 8px;border-radius:${T.radius.small};box-shadow:0 0 0 1px ${T.colors.border};text-align:center;"><p style="margin:0;font-size:20px;line-height:1.1;color:${T.colors.accent};font-weight:800;">${escapeHtml(value)}${unit ? `<span style="font-size:11px;font-weight:600;">${escapeHtml(unit)}</span>` : ""}</p>${label ? `<p style="margin:4px 0 0;font-size:11px;line-height:1.4;color:${T.colors.muted};">${escapeHtml(label)}</p>` : ""}</section>`,
+    )
+    .join("");
+  return root("wf-stats-grid", `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:8px;">${cells}</section>`);
+}
+
+// wf-recap: 回顾小结盒(elevation: ring,独有:编号回顾 + 浅底)
+function renderWfRecap(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  return root(
+    "wf-recap",
+    `${node.fields.count ? `<p style="margin:0 0 6px;font-size:12px;font-weight:700;color:${T.colors.accent};letter-spacing:0.05em;">回顾 · ${escapeHtml(node.fields.count)}</p>` : label(node.fields.label)}<p style="margin:0;font-size:15px;line-height:1.8;color:${T.colors.text};">${escapeHtml(node.fields.body)}</p>`,
+    `padding:14px 16px;background:${T.colors.accentPale};border-radius:${T.radius.medium};box-shadow:0 0 0 1px ${T.colors.border};`,
+  );
+}
+
 export function renderWriteflowModule(node: AdvancedModuleNode) {
   switch (node.name) {
     case "wf-lead":
@@ -326,6 +424,24 @@ export function renderWriteflowModule(node: AdvancedModuleNode) {
       return renderWfCase(node);
     case "wf-author":
       return renderWfAuthor(node);
+    case "wf-checklist":
+      return renderWfChecklist(node);
+    case "wf-question":
+      return renderWfQuestion(node);
+    case "wf-prompt":
+      return renderWfPrompt(node);
+    case "wf-quote-evidence":
+      return renderWfQuoteEvidence(node);
+    case "wf-source":
+      return renderWfSource(node);
+    case "wf-people":
+      return renderWfPeople(node);
+    case "wf-gallery":
+      return renderWfGallery(node);
+    case "wf-stats-grid":
+      return renderWfStatsGrid(node);
+    case "wf-recap":
+      return renderWfRecap(node);
     default:
       return "";
   }
