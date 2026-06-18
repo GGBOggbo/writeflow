@@ -391,6 +391,8 @@ function renderCta(node: AdvancedModuleNode) {
   );
 }
 
+// RENDERERS 保留 legacy 模块渲染实现,前端不再调用但代码留存以备参考。
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const RENDERERS: Partial<
   Record<AdvancedModuleNode["name"], (node: AdvancedModuleNode) => string>
 > = {
@@ -433,6 +435,7 @@ export function renderAdvancedModule(node: AdvancedModuleNode) {
     return renderWriteflowModule(node);
   }
 
-  const renderer = RENDERERS[node.name];
-  return renderer ? renderer(node) : "";
+  // Legacy 模块渲染器代码保留在 RENDERERS map 中以备参考,但前端不再渲染。
+  // 如需恢复,把下面的 return "" 换回原分发逻辑即可。
+  return "";
 }

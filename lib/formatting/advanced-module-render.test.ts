@@ -248,15 +248,14 @@ function parseModule(markdown: string): AdvancedModuleNode {
 
 describe("renderAdvancedModule", () => {
   it.each(LEGACY_ADVANCED_MODULE_NAMES)(
-    "renders the legacy %s module with its own action id and visible content",
+    "legacy %s module is no longer rendered (code retained, frontend hidden)",
     (name) => {
       const sample = MODULE_SAMPLES[name];
       const html = renderAdvancedModule(parseModule(sample.markdown));
 
-      expect(html).toContain(`data-mpa-action-id="${name}"`);
-      expect(html).toContain(sample.expected);
-      expect(html).toContain("style=");
-      expect(html).not.toContain(":::");
+      // Legacy 模块的渲染器代码保留在 RENDERERS map 中,但前端不再渲染。
+      // 期望返回空串——模块既不渲染成 HTML,也不暴露原始围栏。
+      expect(html).toBe("");
     }
   );
 
@@ -609,7 +608,9 @@ count: 三批次
     expect(html).not.toContain("data-mpa-action-id");
   });
 
-  it("uses the shared wechat-native visual contract", () => {
+  // 以下 12 个 legacy 视觉契约测试已停用:legacy 模块不再渲染(代码保留在 RENDERERS map,前端返回空)。
+  // sanitizer 正确性由 wechat-compat.test.ts 独立覆盖。如恢复 legacy 渲染,把下面的 it.skip 改回 it。
+  it.skip("uses the shared wechat-native visual contract", () => {
     const html = renderAdvancedModule(parseModule(MODULE_SAMPLES.hero.markdown));
 
     expect(html).toContain("font-family:");
@@ -618,7 +619,7 @@ count: 三批次
     expect(html).not.toContain("#1f5f46");
   });
 
-  it("renders CTA with the archived warm-paper action skeleton", () => {
+  it.skip("renders CTA with the archived warm-paper action skeleton", () => {
     const html = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.cta.markdown)
     );
@@ -634,7 +635,7 @@ count: 三批次
     expect(html).not.toContain("#1f5f46");
   });
 
-  it("renders verdict as a compact warm-paper judgment card", () => {
+  it.skip("renders verdict as a compact warm-paper judgment card", () => {
     const html = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.verdict.markdown)
     );
@@ -649,7 +650,7 @@ count: 三批次
     expect(html).not.toContain("border:2px solid");
   });
 
-  it("uses distinct reference skeletons for entry and section modules", () => {
+  it.skip("uses distinct reference skeletons for entry and section modules", () => {
     const hero = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.hero.markdown)
     );
@@ -669,7 +670,7 @@ count: 三批次
     expect(labelTitle).toContain("<h4");
   });
 
-  it("uses responsive grid skeletons for evidence modules", () => {
+  it.skip("uses responsive grid skeletons for evidence modules", () => {
     const cards = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.cards.markdown)
     );
@@ -691,7 +692,7 @@ count: 三批次
     );
   });
 
-  it("uses compact judgment and summary reference skeletons", () => {
+  it.skip("uses compact judgment and summary reference skeletons", () => {
     const quote = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.quote.markdown)
     );
@@ -708,7 +709,7 @@ count: 三批次
     expect(faq).toContain(">A<");
   });
 
-  it("uses reference image composition skeletons", () => {
+  it.skip("uses reference image composition skeletons", () => {
     const imageText = renderAdvancedModule(
       parseModule(MODULE_SAMPLES["image-text"].markdown)
     );
@@ -726,7 +727,7 @@ count: 三批次
     expect(imageAnnotate).toContain("aspect-ratio:4/3");
   });
 
-  it("uses reference utility and ending skeletons", () => {
+  it.skip("uses reference utility and ending skeletons", () => {
     const series = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.series.markdown)
     );
@@ -746,7 +747,7 @@ count: 三批次
     expect(toc).toContain("flex-direction:column");
   });
 
-  it("uses the archived utility module skeletons instead of generic shells", () => {
+  it.skip("uses the archived utility module skeletons instead of generic shells", () => {
     const infographic = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.infographic.markdown)
     );
@@ -778,7 +779,7 @@ count: 三批次
     expect(notice).toContain("grid-template-columns:96px 1fr");
   });
 
-  it("uses the archived media, dialogue, and author skeletons", () => {
+  it.skip("uses the archived media, dialogue, and author skeletons", () => {
     const gallery = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.gallery.markdown)
     );
@@ -805,7 +806,7 @@ count: 三批次
     );
   });
 
-  it("keeps safe images and links while rejecting executable URLs", () => {
+  it.skip("keeps safe images and links while rejecting executable URLs", () => {
     const safeImage = renderAdvancedModule(
       parseModule(MODULE_SAMPLES["image-text"].markdown)
     );
@@ -823,7 +824,7 @@ count: 三批次
     expect(unsafe).not.toContain("javascript:");
   });
 
-  it("renders long images inside a bounded vertical preview viewer", () => {
+  it.skip("renders long images inside a bounded vertical preview viewer", () => {
     const html = renderAdvancedModule(
       parseModule(MODULE_SAMPLES.longimage.markdown)
     );

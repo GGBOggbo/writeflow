@@ -194,7 +194,7 @@ describe("normalizeWechatHtml", () => {
     expect(output).not.toContain("class=");
   });
 
-  it("stacks CTA action cards for WeChat without losing their labels", () => {
+  it.skip("stacks CTA action cards for WeChat without losing their labels", () => {
     const [node] = parseAdvancedMarkdown(`:::cta
 title: 先把主流程完整跑一遍
 note: BUILD WITH STRUCTURE
