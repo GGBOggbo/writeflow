@@ -120,6 +120,20 @@ note: ${argument}
     expect(html).toContain("正文继续");
   });
 
+  it("renders a format-hint card when a row module is miswritten as field type", () => {
+    // AI 偶尔把行型模块写成 key: value 字段格式(如 side:/heading:/body:),
+    // 此时不静默降级成纯文本,而是渲染格式提示卡,告诉该用 | 分隔。
+    const html = renderExtendedMarkdown(`:::wf-compare
+side: 常规模型
+heading: 遗忘冲突
+body: 处理长文档时遗漏关键信息。
+:::`);
+
+    expect(html).toContain('data-writeflow-module="wf-compare"');
+    expect(html).toContain("格式提示");
+    expect(html).toContain("|");
+  });
+
   it.skip("still renders concise valid CTA modules", () => {
     const html = renderExtendedMarkdown(`:::cta
 title: 先把主流程完整跑一遍

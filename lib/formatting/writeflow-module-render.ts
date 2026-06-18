@@ -62,8 +62,27 @@ function renderWfPullquote(node: AdvancedModuleNode) {
   );
 }
 
+// 行型模块被误写成字段型时,渲染醒目的格式错误提示卡(不静默降级)。
+// 帮助用户/AI 立刻发现"应该用 | 分隔",而非看到内容消失不知所措。
+function renderRowFormatHint(moduleName: string) {
+  const T = getFormatTokens();
+  return root(
+    moduleName,
+    `<section style="padding:14px 16px;border-left:3px solid ${T.colors.warning};background:${T.colors.warningSoft};border-radius:${T.radius.small};"><p style="margin:0 0 6px;font-size:13px;font-weight:700;color:${T.colors.warning};">格式提示：${escapeHtml(moduleName)} 是行型模块</p><p style="margin:0;font-size:14px;line-height:1.7;color:${T.colors.text};">每行用竖线 <code style="background:${T.colors.accentPale};padding:1px 4px;border-radius:3px;">|</code> 分隔列，不要用 <code style="background:${T.colors.accentPale};padding:1px 4px;border-radius:3px;">key: value</code> 字段格式。示例：<code style="background:${T.colors.accentPale};padding:1px 4px;border-radius:3px;">第一列 | 第二列 | 第三列</code></p></section>`,
+  );
+}
+
 function renderRows(node: AdvancedModuleNode, kind: "points" | "steps" | "compare") {
   const T = getFormatTokens();
+
+  // 容错:检测字段型误用。行型模块若被写成 key: value(如 side: xxx),
+  // parser 会把每行当单个 cell(rows 每项只有 1 列且含冒号)。
+  // 此时不静默降级,而是渲染明显的错误提示卡片,告诉用户/AI 正确格式。
+  const looksLikeFieldType = node.rows.length > 0 &&
+    node.rows.every((row) => row.length === 1 && /^[a-z-]+:\s/.test(row[0] ?? ""));
+  if (looksLikeFieldType) {
+    return renderRowFormatHint(node.name);
+  }
 
   // wf-compare: 左右两列网格,一眼看出对照(DESIGN.md 第5节)。
   // 列定义为 side | heading | body,side 作对照标签。

@@ -120,9 +120,19 @@ export function renderExtendedMarkdown(markdown: string, tokens?: FormatTokens) 
     .map((node) => {
       if (node.type !== "module") return renderMarkdownNode(node.content);
       const validation = validateAdvancedModuleNode(node);
-      return validation.ok
-        ? renderAdvancedModule(node)
-        : renderMarkdownNode(advancedModuleToMarkdown(node));
+      if (validation.ok) {
+        return renderAdvancedModule(node);
+      }
+      // 容错:行型模块被误写成字段型(key: value)时,校验必失败。
+      // 这种情况不降级成纯文本(内容会消失),而是渲染格式提示卡,
+      // 让用户/AI 立刻发现该用 | 分隔。renderRows 内部会检测并提示。
+      const isRowFieldTypeMisuse =
+        node.rows.length > 0 &&
+        node.rows.every((row) => row.length === 1 && /^[a-z-]+:\s/.test(row[0] ?? ""));
+      if (isRowFieldTypeMisuse) {
+        return renderAdvancedModule(node);
+      }
+      return renderMarkdownNode(advancedModuleToMarkdown(node));
     })
     .join("");
   const footnoteHtml = collectedFootnotes.size
