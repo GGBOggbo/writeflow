@@ -42,17 +42,17 @@ export const WRITEFLOW_MODULE_NAMES = [
   "wf-compare",
   "wf-image-note",
   // 批次1:高频模块
-  "wf-toc",
-  "wf-quote",
+  "wf-navlist",
+  "wf-cite",
   "wf-highlight",
-  "wf-faq",
+  "wf-qa",
   "wf-metric",
   "wf-timeline",
   "wf-callout",
   "wf-signoff",
   // 批次2:常用模块
   "wf-hook",
-  "wf-part",
+  "wf-chapter",
   "wf-divider",
   "wf-aside",
   "wf-proscons",
@@ -60,13 +60,13 @@ export const WRITEFLOW_MODULE_NAMES = [
   "wf-case",
   "wf-author",
   // 批次3:补充模块(凑够 33)
-  "wf-checklist",
+  "wf-tasks",
   "wf-question",
   "wf-prompt",
   "wf-quote-evidence",
   "wf-source",
-  "wf-people",
-  "wf-gallery",
+  "wf-profiles",
+  "wf-imagewall",
   "wf-stats-grid",
   "wf-recap",
 ] as const;
@@ -435,7 +435,7 @@ export const MODULE_DEFS = {
     optional: ["title", "body", "alt", "note"],
   },
   // ===== 批次1:高频模块 =====
-  "wf-toc": {
+  "wf-navlist": {
     usage: "Writeflow 目录阅读节奏块，用于呈现长文导航。索引从原文章节顺序抽取。",
     kind: "rows",
     columns: ["index", "title", "anchor"],
@@ -443,7 +443,7 @@ export const MODULE_DEFS = {
     maxColumns: 3,
     minRows: 2,
   },
-  "wf-quote": {
+  "wf-cite": {
     usage: "Writeflow 长引用块，用于呈现原文已有的较长引用。区别于 wf-pullquote：带浅底背景块，承载更长文本。",
     kind: "fields",
     required: ["body"],
@@ -455,7 +455,7 @@ export const MODULE_DEFS = {
     required: ["body"],
     optional: ["label"],
   },
-  "wf-faq": {
+  "wf-qa": {
     usage: "Writeflow 问答阅读节奏块，用于呈现原文已有的单个问答。Q 标记锚 + 缩进答案。",
     kind: "fields",
     required: ["question", "answer"],
@@ -494,7 +494,7 @@ export const MODULE_DEFS = {
     required: ["body"],
     optional: ["label"],
   },
-  "wf-part": {
+  "wf-chapter": {
     usage: "Writeflow 大部分割块，用于呈现原文已有的篇章分隔。超大编号 + 粗线。",
     kind: "fields",
     required: ["label", "title"],
@@ -541,7 +541,7 @@ export const MODULE_DEFS = {
     optional: ["role", "bio"],
   },
   // ===== 批次3:补充模块(凑够 33) =====
-  "wf-checklist": {
+  "wf-tasks": {
     usage: "Writeflow 清单/核对项块，用于呈现原文已有的待办或核对列表。勾选符号 + 列表。",
     kind: "rows",
     columns: ["item", "checked", "note"],
@@ -573,7 +573,7 @@ export const MODULE_DEFS = {
     required: ["title"],
     optional: ["publisher", "url"],
   },
-  "wf-people": {
+  "wf-profiles": {
     usage: "Writeflow 多人物简介块，用于呈现原文已有多位人物。每行一人。",
     kind: "rows",
     columns: ["name", "role", "note"],
@@ -581,7 +581,7 @@ export const MODULE_DEFS = {
     maxColumns: 3,
     minRows: 2,
   },
-  "wf-gallery": {
+  "wf-imagewall": {
     usage: "Writeflow 多图并排块，用于呈现原文已有的多张图片。src + caption。",
     kind: "rows",
     columns: ["src", "caption"],

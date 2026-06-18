@@ -27,13 +27,13 @@ const ROW_MODULES = new Set<AdvancedModuleName>([
   "wf-points",
   "wf-steps",
   "wf-compare",
-  "wf-toc",
+  "wf-navlist",
   "wf-timeline",
   "wf-proscons",
   "wf-stats",
-  "wf-checklist",
-  "wf-people",
-  "wf-gallery",
+  "wf-tasks",
+  "wf-profiles",
+  "wf-imagewall",
   "wf-stats-grid",
 ]);
 

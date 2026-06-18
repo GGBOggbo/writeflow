@@ -289,26 +289,26 @@ source: 原文
   });
 
   // ===== 批次1:8 个新模块渲染测试 =====
-  it("renders wf-toc as a numbered directory list", () => {
+  it("renders wf-navlist as a numbered directory list", () => {
     const html = renderAdvancedModule(
-      parseModule(`:::wf-toc
+      parseModule(`:::wf-navlist
 01 | 先确认主流程 | main
 02 | 再验证复制效果 | copy
 :::`)
     );
-    expect(html).toContain('data-writeflow-module="wf-toc"');
+    expect(html).toContain('data-writeflow-module="wf-navlist"');
     expect(html).toContain("先确认主流程");
     expect(html).not.toContain("data-mpa-action-id");
   });
 
-  it("renders wf-quote with left block and pale background", () => {
+  it("renders wf-cite with left block and pale background", () => {
     const html = renderAdvancedModule(
-      parseModule(`:::wf-quote
+      parseModule(`:::wf-cite
 body: 排版的核心是让读者的眼睛有地方休息。
 source: 原文
 :::`)
     );
-    expect(html).toContain('data-writeflow-module="wf-quote"');
+    expect(html).toContain('data-writeflow-module="wf-cite"');
     expect(html).toContain("排版的核心");
     expect(html).toContain("border-left:4px solid");
     expect(html).not.toContain("data-mpa-action-id");
@@ -326,14 +326,14 @@ body: 预览好看不算完成，粘贴不塌才算完成。
     expect(html).not.toContain("data-mpa-action-id");
   });
 
-  it("renders wf-faq with Q anchor and indented answer", () => {
+  it("renders wf-qa with Q anchor and indented answer", () => {
     const html = renderAdvancedModule(
-      parseModule(`:::wf-faq
+      parseModule(`:::wf-qa
 question: 排版会改写我的内容吗？
 answer: 不会，只改呈现节奏，不改内容。
 :::`)
     );
-    expect(html).toContain('data-writeflow-module="wf-faq"');
+    expect(html).toContain('data-writeflow-module="wf-qa"');
     expect(html).toContain("排版会改写");
     expect(html).not.toContain("data-mpa-action-id");
   });
@@ -403,14 +403,14 @@ body: 但真正让读者留下来的，不是花哨的排版
     expect(html).not.toContain("data-mpa-action-id");
   });
 
-  it("renders wf-part with oversized label and top rule", () => {
+  it("renders wf-chapter with oversized label and top rule", () => {
     const html = renderAdvancedModule(
-      parseModule(`:::wf-part
+      parseModule(`:::wf-chapter
 label: 第一部分
 title: 先跑通主流程
 :::`)
     );
-    expect(html).toContain('data-writeflow-module="wf-part"');
+    expect(html).toContain('data-writeflow-module="wf-chapter"');
     expect(html).toContain("font-size:28px");
     expect(html).toContain("border-top:2px solid");
     expect(html).not.toContain("data-mpa-action-id");
@@ -494,14 +494,14 @@ bio: 专注让复杂的事变简单。
   });
 
   // ===== 批次3:9 个新模块渲染测试 =====
-  it("renders wf-checklist with check marks", () => {
+  it("renders wf-tasks with check marks", () => {
     const html = renderAdvancedModule(
-      parseModule(`:::wf-checklist
+      parseModule(`:::wf-tasks
 确认主流程 | ✓ | 跑通用户路径。
 验证复制效果 | ✗ | 还没测。
 :::`)
     );
-    expect(html).toContain('data-writeflow-module="wf-checklist"');
+    expect(html).toContain('data-writeflow-module="wf-tasks"');
     expect(html).toContain("✓");
     expect(html).toContain("✗");
     expect(html).not.toContain("data-mpa-action-id");
@@ -556,27 +556,27 @@ publisher: Writeflow
     expect(html).not.toContain("data-mpa-action-id");
   });
 
-  it("renders wf-people as rows with initial circles", () => {
+  it("renders wf-profiles as rows with initial circles", () => {
     const html = renderAdvancedModule(
-      parseModule(`:::wf-people
+      parseModule(`:::wf-profiles
 张三 | 作者 | 写了主体内容。
 李四 | 编辑 | 负责校对。
 :::`)
     );
-    expect(html).toContain('data-writeflow-module="wf-people"');
+    expect(html).toContain('data-writeflow-module="wf-profiles"');
     expect(html).toContain("张三");
     expect(html).toContain("border-radius:999px");
     expect(html).not.toContain("data-mpa-action-id");
   });
 
-  it("renders wf-gallery as a two-column image grid", () => {
+  it("renders wf-imagewall as a two-column image grid", () => {
     const html = renderAdvancedModule(
-      parseModule(`:::wf-gallery
+      parseModule(`:::wf-imagewall
 https://example.com/a.png | 图一
 https://example.com/b.png | 图二
 :::`)
     );
-    expect(html).toContain('data-writeflow-module="wf-gallery"');
+    expect(html).toContain('data-writeflow-module="wf-imagewall"');
     expect(html).toContain("grid-template-columns:1fr 1fr");
     expect(html).toContain("example.com/a.png");
     expect(html).not.toContain("data-mpa-action-id");

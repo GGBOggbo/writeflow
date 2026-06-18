@@ -108,7 +108,7 @@ function renderWfImageNote(node: AdvancedModuleNode) {
 
 // ===== 批次1:高频模块渲染器(每个有独有视觉签名) =====
 
-// wf-toc: 数字编号 + 左侧竖线连接的目录(区别 points:更紧凑,竖线贯穿)
+// wf-navlist: 数字编号 + 左侧竖线连接的目录(区别 points:更紧凑,竖线贯穿)
 function renderWfToc(node: AdvancedModuleNode) {
   const T = getFormatTokens();
   const rows = node.rows
@@ -117,14 +117,14 @@ function renderWfToc(node: AdvancedModuleNode) {
         `<section style="box-sizing:border-box;position:relative;margin:0;padding:6px 0 6px 24px;"><span style="position:absolute;left:0;top:8px;width:18px;font-size:13px;font-weight:700;color:${T.colors.accent};text-align:center;">${escapeHtml(index)}</span><p style="margin:0;font-size:15px;line-height:1.6;color:${T.colors.text};">${escapeHtml(title)}</p>${anchor ? `<p style="margin:2px 0 0;font-size:12px;color:${T.colors.muted};">${escapeHtml(anchor)}</p>` : ""}</section>`,
     )
     .join("");
-  return root("wf-toc", rows);
+  return root("wf-navlist", rows);
 }
 
-// wf-quote: 左粗色块 + 浅底(区别 pullquote:有完整背景块,承载更长文本)
+// wf-cite: 左粗色块 + 浅底(区别 pullquote:有完整背景块,承载更长文本)
 function renderWfQuote(node: AdvancedModuleNode) {
   const T = getFormatTokens();
   return root(
-    "wf-quote",
+    "wf-cite",
     `${label(node.fields.label)}<p style="margin:0;font-size:16px;line-height:1.85;color:${T.colors.text};">${escapeHtml(node.fields.body)}</p>${node.fields.source ? `<p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:${T.colors.muted};">${escapeHtml(node.fields.source)}</p>` : ""}`,
     `padding:16px 18px;background:${T.colors.accentPale};border-left:4px solid ${T.colors.accent};border-radius:${T.radius.small};`,
   );
@@ -140,11 +140,11 @@ function renderWfHighlight(node: AdvancedModuleNode) {
   );
 }
 
-// wf-faq: 问号锚标 + 缩进答案(独有:Q 标记符号 + 问答堆叠)
+// wf-qa: 问号锚标 + 缩进答案(独有:Q 标记符号 + 问答堆叠)
 function renderWfFaq(node: AdvancedModuleNode) {
   const T = getFormatTokens();
   return root(
-    "wf-faq",
+    "wf-qa",
     `${label(node.fields.label)}<p style="margin:0 0 10px;font-size:16px;line-height:1.6;color:${T.colors.text};font-weight:700;"><span style="display:inline-block;margin-right:6px;color:${T.colors.accent};font-weight:800;">Q</span>${escapeHtml(node.fields.question)}</p><p style="margin:0 0 0 22px;padding:12px 14px;font-size:15px;line-height:1.8;color:${T.colors.text};background:${T.colors.accentPale};border-radius:${T.radius.small};">${escapeHtml(node.fields.answer)}</p>`,
   );
 }
@@ -204,11 +204,11 @@ function renderWfHook(node: AdvancedModuleNode) {
   );
 }
 
-// wf-part: 超大编号 + 粗线(elevation: flat,独有:超大编号字号 + 顶部粗线)
+// wf-chapter: 超大编号 + 粗线(elevation: flat,独有:超大编号字号 + 顶部粗线)
 function renderWfPart(node: AdvancedModuleNode) {
   const T = getFormatTokens();
   return root(
-    "wf-part",
+    "wf-chapter",
     `<p style="margin:0 0 4px;font-size:13px;line-height:1.4;color:${T.colors.accent};font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${escapeHtml(node.fields.label)}</p><p style="margin:0;font-size:28px;line-height:1.2;color:${T.colors.text};font-weight:800;">${escapeHtml(node.fields.title)}</p>${node.fields.subtitle ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:${T.colors.muted};">${escapeHtml(node.fields.subtitle)}</p>` : ""}`,
     `padding:20px 0 8px;border-top:2px solid ${T.colors.text};`,
   );
@@ -278,7 +278,7 @@ function renderWfAuthor(node: AdvancedModuleNode) {
 
 // ===== 批次3:补充模块渲染器(凑够 33) =====
 
-// wf-checklist: 勾选符号 + 列表(elevation: flat,独有:✓/✗ 符号锚 + 缩进)
+// wf-tasks: 勾选符号 + 列表(elevation: flat,独有:✓/✗ 符号锚 + 缩进)
 function renderWfChecklist(node: AdvancedModuleNode) {
   const T = getFormatTokens();
   const rows = node.rows
@@ -289,7 +289,7 @@ function renderWfChecklist(node: AdvancedModuleNode) {
       return `<section style="box-sizing:border-box;margin:0 0 10px;padding:6px 0;border-bottom:1px solid ${T.colors.border};"><p style="margin:0;font-size:15px;line-height:1.6;color:${T.colors.text};"><span style="display:inline-block;width:20px;color:${markColor};font-weight:800;">${mark}</span>${escapeHtml(item)}</p>${note ? `<p style="margin:3px 0 0 20px;font-size:13px;line-height:1.6;color:${T.colors.muted};">${escapeHtml(note)}</p>` : ""}</section>`;
     })
     .join("");
-  return root("wf-checklist", rows);
+  return root("wf-tasks", rows);
 }
 
 // wf-question: 居中问号锚(elevation: flat,独有:居中 ? 符号 + 反问)
@@ -331,7 +331,7 @@ function renderWfSource(node: AdvancedModuleNode) {
   );
 }
 
-// wf-people: 多人物行(elevation: flat,独有:首字母圆 + 行式堆叠)
+// wf-profiles: 多人物行(elevation: flat,独有:首字母圆 + 行式堆叠)
 function renderWfPeople(node: AdvancedModuleNode) {
   const T = getFormatTokens();
   const rows = node.rows
@@ -339,10 +339,10 @@ function renderWfPeople(node: AdvancedModuleNode) {
       `<section style="box-sizing:border-box;margin:0 0 12px;display:flex;align-items:flex-start;gap:10px;"><span style="flex-shrink:0;width:32px;height:32px;border-radius:999px;background:${T.colors.accentSoft};color:${T.colors.accent};font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;">${escapeHtml(name.charAt(0))}</span><section style="flex:1;"><p style="margin:0 0 2px;font-size:15px;line-height:1.4;color:${T.colors.text};font-weight:700;">${escapeHtml(name)}${role ? `<span style="font-size:12px;color:${T.colors.muted};font-weight:400;margin-left:6px;">${escapeHtml(role)}</span>` : ""}</p>${note ? `<p style="margin:0;font-size:13px;line-height:1.6;color:${T.colors.muted};">${escapeHtml(note)}</p>` : ""}</section></section>`,
     )
     .join("");
-  return root("wf-people", rows);
+  return root("wf-profiles", rows);
 }
 
-// wf-gallery: 多图并排(elevation: flat,独有:两列图网格)
+// wf-imagewall: 多图并排(elevation: flat,独有:两列图网格)
 function renderWfGallery(node: AdvancedModuleNode) {
   const T = getFormatTokens();
   const cells = node.rows
@@ -350,7 +350,7 @@ function renderWfGallery(node: AdvancedModuleNode) {
       `<section style="box-sizing:border-box;"><img src="${escapeHtml(src)}" alt="${escapeHtml(caption)}" style="display:block;width:100%;height:auto;border-radius:${T.radius.medium};" />${caption ? `<p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:${T.colors.muted};text-align:center;">${escapeHtml(caption)}</p>` : ""}</section>`,
     )
     .join("");
-  return root("wf-gallery", `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:10px;">${cells}</section>`);
+  return root("wf-imagewall", `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:10px;">${cells}</section>`);
 }
 
 // wf-stats-grid: 四宫格数据(比 wf-stats 更紧凑,elevation: ring + 间距)
@@ -392,13 +392,13 @@ export function renderWriteflowModule(node: AdvancedModuleNode) {
       return renderRows(node, "compare");
     case "wf-image-note":
       return renderWfImageNote(node);
-    case "wf-toc":
+    case "wf-navlist":
       return renderWfToc(node);
-    case "wf-quote":
+    case "wf-cite":
       return renderWfQuote(node);
     case "wf-highlight":
       return renderWfHighlight(node);
-    case "wf-faq":
+    case "wf-qa":
       return renderWfFaq(node);
     case "wf-metric":
       return renderWfMetric(node);
@@ -410,7 +410,7 @@ export function renderWriteflowModule(node: AdvancedModuleNode) {
       return renderWfSignoff(node);
     case "wf-hook":
       return renderWfHook(node);
-    case "wf-part":
+    case "wf-chapter":
       return renderWfPart(node);
     case "wf-divider":
       return renderWfDivider(node);
@@ -424,7 +424,7 @@ export function renderWriteflowModule(node: AdvancedModuleNode) {
       return renderWfCase(node);
     case "wf-author":
       return renderWfAuthor(node);
-    case "wf-checklist":
+    case "wf-tasks":
       return renderWfChecklist(node);
     case "wf-question":
       return renderWfQuestion(node);
@@ -434,9 +434,9 @@ export function renderWriteflowModule(node: AdvancedModuleNode) {
       return renderWfQuoteEvidence(node);
     case "wf-source":
       return renderWfSource(node);
-    case "wf-people":
+    case "wf-profiles":
       return renderWfPeople(node);
-    case "wf-gallery":
+    case "wf-imagewall":
       return renderWfGallery(node);
     case "wf-stats-grid":
       return renderWfStatsGrid(node);
