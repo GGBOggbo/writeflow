@@ -120,18 +120,37 @@ note: ${argument}
     expect(html).toContain("正文继续");
   });
 
-  it("renders a format-hint card when a row module is miswritten as field type", () => {
-    // AI 偶尔把行型模块写成 key: value 字段格式(如 side:/heading:/body:),
-    // 此时不静默降级成纯文本,而是渲染格式提示卡,告诉该用 | 分隔。
+  it("renders wf-compare field-type input as a two-column comparison grid", () => {
+    // wf-compare 支持字段型写法(side:/heading:/body: 重复多组),
+    // 渲染成左右两列对照网格。
     const html = renderExtendedMarkdown(`:::wf-compare
 side: 常规模型
 heading: 遗忘冲突
 body: 处理长文档时遗漏关键信息。
+
+side: GLM-5.2
+heading: 全程记忆
+body: 提取了全部付款节点。
 :::`);
 
     expect(html).toContain('data-writeflow-module="wf-compare"');
+    expect(html).toContain("grid-template-columns:1fr 1fr");
+    expect(html).toContain("常规模型");
+    expect(html).toContain("GLM-5.2");
+    expect(html).not.toContain(":::wf");
+  });
+
+  it("renders a format-hint card when a pure row module is miswritten as field type", () => {
+    // wf-points 是纯行型模块(无字段写法),若被写成 key: value 字段格式,
+    // 渲染格式提示卡而非静默降级。
+    const html = renderExtendedMarkdown(`:::wf-points
+index: 01
+heading: 第一点
+body: 说明。
+:::`);
+
+    expect(html).toContain('data-writeflow-module="wf-points"');
     expect(html).toContain("格式提示");
-    expect(html).toContain("|");
   });
 
   it.skip("still renders concise valid CTA modules", () => {

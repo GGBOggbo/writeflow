@@ -72,7 +72,7 @@ function renderRowFormatHint(moduleName: string) {
   );
 }
 
-function renderRows(node: AdvancedModuleNode, kind: "points" | "steps" | "compare") {
+function renderRows(node: AdvancedModuleNode, kind: "points" | "steps") {
   const T = getFormatTokens();
 
   // 容错:检测字段型误用。行型模块若被写成 key: value(如 side: xxx),
@@ -84,20 +84,6 @@ function renderRows(node: AdvancedModuleNode, kind: "points" | "steps" | "compar
     return renderRowFormatHint(node.name);
   }
 
-  // wf-compare: 左右两列网格,一眼看出对照(DESIGN.md 第5节)。
-  // 列定义为 side | heading | body,side 作对照标签。
-  if (kind === "compare") {
-    const cells = node.rows
-      .map(([side = "", heading = "", body = ""]) =>
-        `<section style="box-sizing:border-box;padding:14px;border-radius:${T.radius.medium};background:${T.colors.accentPale};"><p style="margin:0 0 8px;font-size:12px;line-height:1.4;color:${T.colors.muted};font-weight:700;letter-spacing:0.05em;">${escapeHtml(side)}</p><p style="margin:0 0 6px;font-size:15px;line-height:1.5;color:${T.colors.text};font-weight:700;">${escapeHtml(heading)}</p><p style="margin:0;font-size:14px;line-height:1.75;color:${T.colors.text};">${escapeHtml(body)}</p></section>`
-      )
-      .join("");
-    return root(
-      `wf-compare`,
-      `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:12px;">${cells}</section>`
-    );
-  }
-
   // wf-points / wf-steps: 描边环卡片,堆叠(严禁 display:grid,现有测试强制)。
   const rows = node.rows
     .map(([index = "", heading = "", body = ""]) =>
@@ -106,6 +92,44 @@ function renderRows(node: AdvancedModuleNode, kind: "points" | "steps" | "compar
     .join("");
 
   return root(`wf-${kind}`, rows);
+}
+
+// wf-compare: 字段型对照块。从 fieldEntries 收集 side/heading/body
+// (每个 key 可重复多次),按下标配对成左右两列网格。
+// 兼容 AI 的字段写法(side:/heading:/body:)和用户手写。
+function renderWfCompare(node: AdvancedModuleNode) {
+  const T = getFormatTokens();
+  const collect = (key: string) =>
+    node.fieldEntries
+      .filter((entry) => entry.key === key)
+      .map((entry) => entry.value);
+
+  const sides = collect("side");
+  const headings = collect("heading");
+  const bodies = collect("body");
+  const pairCount = Math.max(sides.length, headings.length, bodies.length);
+
+  // 如果字段型没收集到数据(比如用户用了 | 行型格式但被当 fields 解析),
+  // 回退到从 node.rows 取(保留旧行为兼容)。
+  const cells = pairCount === 0
+    ? node.rows.map(([side = "", heading = "", body = ""]) => ({ side, heading, body }))
+    : Array.from({ length: pairCount }, (_, i) => ({
+        side: sides[i] ?? "",
+        heading: headings[i] ?? "",
+        body: bodies[i] ?? "",
+      }));
+
+  const cellHtml = cells
+    .map(
+      ({ side, heading, body }) =>
+        `<section style="box-sizing:border-box;padding:14px;border-radius:${T.radius.medium};background:${T.colors.accentPale};"><p style="margin:0 0 8px;font-size:12px;line-height:1.4;color:${T.colors.muted};font-weight:700;letter-spacing:0.05em;">${escapeHtml(side)}</p><p style="margin:0 0 6px;font-size:15px;line-height:1.5;color:${T.colors.text};font-weight:700;">${escapeHtml(heading)}</p><p style="margin:0;font-size:14px;line-height:1.75;color:${T.colors.text};">${escapeHtml(body)}</p></section>`,
+    )
+    .join("");
+
+  return root(
+    "wf-compare",
+    `<section style="box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:12px;">${cellHtml}</section>`,
+  );
 }
 
 function renderWfNote(node: AdvancedModuleNode) {
@@ -408,7 +432,7 @@ export function renderWriteflowModule(node: AdvancedModuleNode) {
     case "wf-note":
       return renderWfNote(node);
     case "wf-compare":
-      return renderRows(node, "compare");
+      return renderWfCompare(node);
     case "wf-image-note":
       return renderWfImageNote(node);
     case "wf-navlist":

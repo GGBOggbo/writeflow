@@ -78,7 +78,7 @@ export const ADVANCED_MODULE_NAMES = [
 
 export type AdvancedModuleName = (typeof ADVANCED_MODULE_NAMES)[number];
 
-type RepeatedField = {
+export type RepeatedField = {
   key: string;
   minCount: number;
   columns?: readonly string[];
@@ -421,12 +421,15 @@ export const MODULE_DEFS = {
     optional: ["label", "title"],
   },
   "wf-compare": {
-    usage: "Writeflow 对比阅读节奏块，用于呈现原文已有对比、前后差异或两种选择。",
-    kind: "rows",
-    columns: ["side", "heading", "body"],
-    requiredColumns: 3,
-    maxColumns: 3,
-    minRows: 2,
+    usage: "Writeflow 对比阅读节奏块，用于呈现原文已有对比、前后差异或两种选择。字段型：side:/heading:/body: 重复多组，每组一列对照。",
+    kind: "fields",
+    required: ["side", "heading", "body"],
+    optional: [],
+    repeated: [
+      { key: "side", minCount: 2 },
+      { key: "heading", minCount: 2 },
+      { key: "body", minCount: 2 },
+    ],
   },
   "wf-image-note": {
     usage: "Writeflow 图片说明阅读节奏块，用于绑定原文已有图片和说明文字。",
@@ -644,11 +647,12 @@ export function formatAdvancedModuleContracts() {
       if (repeated?.length) {
         parts.push(
           `可重复 ${repeated
-            .map(({ key, minCount, columns }) =>
-              columns
-                ? `${key}(至少 ${minCount} 次，每次 ${columns.join(" | ")})`
-                : `${key}(至少 ${minCount} 次)`
-            )
+            .map((rawField) => {
+              const field = rawField as RepeatedField;
+              return field.columns
+                ? `${field.key}(至少 ${field.minCount} 次，每次 ${field.columns.join(" | ")})`
+                : `${field.key}(至少 ${field.minCount} 次)`;
+            })
             .join(", ")}`
         );
       }

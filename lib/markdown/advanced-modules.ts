@@ -3,6 +3,7 @@ import {
   isAdvancedModuleName,
   type AdvancedModuleName,
   type FieldModuleDef,
+  type RepeatedField,
 } from "./module-defs";
 
 export {
@@ -26,7 +27,6 @@ const ROW_MODULES = new Set<AdvancedModuleName>([
   "notice",
   "wf-points",
   "wf-steps",
-  "wf-compare",
   "wf-navlist",
   "wf-timeline",
   "wf-proscons",
@@ -235,19 +235,20 @@ export function validateAdvancedModuleNode(
     }
 
     for (const repeatedField of repeated ?? []) {
+      const field = repeatedField as RepeatedField;
       const values = node.fieldEntries
-        .filter(({ key }) => key === repeatedField.key)
+        .filter(({ key }) => key === field.key)
         .map(({ value }) => value);
-      if (values.length < repeatedField.minCount) {
+      if (values.length < field.minCount) {
         return invalidContract(
           node.name,
-          `${node.name} 字段 ${repeatedField.key} 至少需要 ${repeatedField.minCount} 次`
+          `${node.name} 字段 ${field.key} 至少需要 ${field.minCount} 次`
         );
       }
       for (const [index, value] of values.entries()) {
         const columns = value.split("|").map((cell) => cell.trim());
-        const requiredColumns = repeatedField.requiredColumns;
-        const maxColumns = repeatedField.maxColumns;
+        const requiredColumns = field.requiredColumns;
+        const maxColumns = field.maxColumns;
         if (
           requiredColumns !== undefined &&
           maxColumns === requiredColumns &&
@@ -255,7 +256,7 @@ export function validateAdvancedModuleNode(
         ) {
           return invalidContract(
             node.name,
-            `${node.name} 字段 ${repeatedField.key} 第 ${index + 1} 次必须是 ${requiredColumns} 列`
+            `${node.name} 字段 ${field.key} 第 ${index + 1} 次必须是 ${requiredColumns} 列`
           );
         }
         if (
@@ -267,13 +268,13 @@ export function validateAdvancedModuleNode(
         ) {
           return invalidContract(
             node.name,
-            `${node.name} 字段 ${repeatedField.key} 第 ${index + 1} 次至少需要 ${requiredColumns} 个非空值`
+            `${node.name} 字段 ${field.key} 第 ${index + 1} 次至少需要 ${requiredColumns} 个非空值`
           );
         }
         if (maxColumns !== undefined && columns.length > maxColumns) {
           return invalidContract(
             node.name,
-            `${node.name} 字段 ${repeatedField.key} 第 ${index + 1} 次最多允许 ${maxColumns} 列`
+            `${node.name} 字段 ${field.key} 第 ${index + 1} 次最多允许 ${maxColumns} 列`
           );
         }
       }
