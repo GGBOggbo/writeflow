@@ -111,6 +111,32 @@ function validateFormattedLayout(source: string, formatted: string) {
     };
   }
 
+  const sectionSequence = validateWfSectionSequence(formatted);
+  if (!sectionSequence.ok) {
+    return sectionSequence;
+  }
+
+  return { ok: true as const };
+}
+
+function validateWfSectionSequence(content: string) {
+  const sections = parseAdvancedMarkdown(content).filter(
+    (node) => node.type === "module" && node.name === "wf-section"
+  );
+
+  for (const [index, section] of sections.entries()) {
+    if (section.type !== "module") continue;
+    const expected = String(index + 1).padStart(2, "0");
+    const actual = section.fields.index?.trim() ?? "";
+
+    if (actual !== expected) {
+      return {
+        ok: false as const,
+        reason: `wf-section numbering must start at 01 and stay continuous; expected ${expected}, got ${actual || "(empty)"}.`,
+      };
+    }
+  }
+
   return { ok: true as const };
 }
 

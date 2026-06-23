@@ -96,6 +96,62 @@ describe("layoutDraftModules", () => {
     expect(result.ctaCount).toBe(0);
     expect(result.content).toBe(formatted);
   });
+
+  it("retries when wf-section numbering starts at 02", async () => {
+    const invalid = [
+      ":::wf-section",
+      "index: 02",
+      "title: 从潜意识渴望到明牌宣告",
+      ":::",
+      "",
+      "正文继续。",
+    ].join("\n");
+    const valid = [
+      ":::wf-section",
+      "index: 01",
+      "title: 从悬案开始",
+      ":::",
+      "",
+      "正文继续。",
+    ].join("\n");
+    const format = vi
+      .fn()
+      .mockResolvedValueOnce(invalid)
+      .mockResolvedValueOnce(valid);
+
+    const result = await layoutDraftModules(plainDraft, format);
+
+    expect(format).toHaveBeenCalledTimes(2);
+    expect(format.mock.calls[1]?.[1]?.qualityFeedback).toContain(
+      "wf-section"
+    );
+    expect(result.source).toBe("ai_retry");
+    expect(result.content).toBe(valid);
+  });
+
+  it("accepts continuous wf-section numbering from 01", async () => {
+    const formatted = [
+      ":::wf-section",
+      "index: 01",
+      "title: 第一部分",
+      ":::",
+      "",
+      "正文。",
+      "",
+      ":::wf-section",
+      "index: 02",
+      "title: 第二部分",
+      ":::",
+    ].join("\n");
+
+    const result = await layoutDraftModules(
+      plainDraft,
+      vi.fn().mockResolvedValue(formatted)
+    );
+
+    expect(result.source).toBe("ai");
+    expect(result.content).toBe(formatted);
+  });
 });
 
 describe("buildBasicMarkdownFallback", () => {

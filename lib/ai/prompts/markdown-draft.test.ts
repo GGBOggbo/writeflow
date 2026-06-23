@@ -47,6 +47,16 @@ describe("buildMarkdownDraftPrompt", () => {
     expect(prompt.userPrompt).toContain("允许忠实抽取或轻微压缩已有句子");
   });
 
+  it("explains when to use modules and keeps wf-section numbering continuous", () => {
+    const prompt = buildMarkdownDraftPrompt("第一部分。\n\n第二部分。");
+
+    expect(prompt.userPrompt).toContain("=== 模块使用决策规则 ===");
+    expect(prompt.userPrompt).toContain("wf-section 只用于原文明确进入新的大章节");
+    expect(prompt.userPrompt).toContain("wf-section 编号必须从 01 开始");
+    expect(prompt.userPrompt).toContain("禁止第一个 wf-section 使用 02");
+    expect(prompt.userPrompt).toContain("不确定是否是章节时，用普通 Markdown ## 标题");
+  });
+
   it("includes concrete quality feedback when retrying", () => {
     const prompt = buildMarkdownDraftPrompt("第一段。\n\n第二段。", {
       qualityFeedback: "上一次结果没有 Markdown 标题。",
