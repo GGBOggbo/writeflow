@@ -36,7 +36,21 @@ export function getDatabaseConfig(env = process.env): DatabaseConfig {
     throw new Error("DATABASE_URL is required for postgres.");
   }
 
-  return { provider: "postgres", connectionString: env.DATABASE_URL };
+  return {
+    provider: "postgres",
+    connectionString: normalizePostgresConnectionString(env.DATABASE_URL),
+  };
+}
+
+function normalizePostgresConnectionString(connectionString: string) {
+  if (/[?&]uselibpqcompat=true(?:&|#|$)/i.test(connectionString)) {
+    return connectionString;
+  }
+
+  return connectionString.replace(
+    /([?&]sslmode=)require(?=&|#|$)/i,
+    "$1verify-full"
+  );
 }
 
 export function parseSqlitePath(databaseUrl: string): string {

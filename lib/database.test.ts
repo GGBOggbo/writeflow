@@ -21,6 +21,21 @@ describe("database config", () => {
     });
   });
 
+  it("makes legacy sslmode=require semantics explicit", () => {
+    expect(
+      getDatabaseConfig({
+        NODE_ENV: "test",
+        DATABASE_PROVIDER: "postgres",
+        DATABASE_URL:
+          "postgresql://user:password@example.com/database?sslmode=require",
+      })
+    ).toEqual({
+      provider: "postgres",
+      connectionString:
+        "postgresql://user:password@example.com/database?sslmode=verify-full",
+    });
+  });
+
   it("reads sqlite file URLs", () => {
     const config = getDatabaseConfig({
       NODE_ENV: "test",
