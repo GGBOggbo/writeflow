@@ -549,6 +549,86 @@ export async function formatDraft(
 
 const MATERIAL_PLACEHOLDER_PATTERN = /【💡需要你补充：[^】]+】/g;
 
+function isStandaloneMaterialPlaceholder(
+  source: string,
+  placeholder: RegExpMatchArray
+) {
+  const start = placeholder.index ?? 0;
+  const end = start + placeholder[0].length;
+  const lineStart = source.lastIndexOf("\n", start - 1) + 1;
+  const nextLineBreak = source.indexOf("\n", end);
+  const lineEnd = nextLineBreak < 0 ? source.length : nextLineBreak;
+
+  return source.slice(lineStart, lineEnd).trim() === placeholder[0];
+}
+
+function splitMaterialParagraph(paragraph: string) {
+  const trimmed = paragraph.trim();
+  if (
+    !trimmed ||
+    trimmed.includes("\n") ||
+    /^(?:#{1,6}\s|>|[-+*]\s|\d+[.)]\s|```|:::|[a-zA-Z0-9_.-]+\s*:)/.test(
+      trimmed
+    )
+  ) {
+    return [trimmed];
+  }
+
+  const sentences =
+    trimmed.match(/[^。！？!?]+(?:[。！？!?]+[”’"']*|$)/g)?.map((sentence) =>
+      sentence.trim()
+    ) ?? [];
+  if (sentences.length <= 2) return [trimmed];
+
+  const paragraphs: string[] = [];
+  let current = "";
+  let sentenceCount = 0;
+
+  for (const sentence of sentences) {
+    const nextLength = Array.from(`${current}${sentence}`).length;
+    if (current && (sentenceCount >= 2 || nextLength > 96)) {
+      paragraphs.push(current);
+      current = "";
+      sentenceCount = 0;
+    }
+    current += sentence;
+    sentenceCount += 1;
+  }
+
+  if (current) paragraphs.push(current);
+  return paragraphs;
+}
+
+function normalizeMaterialCompletionRhythm(source: string, candidate: string) {
+  const placeholders = [...source.matchAll(MATERIAL_PLACEHOLDER_PATTERN)];
+  const fixedSegments = source.split(MATERIAL_PLACEHOLDER_PATTERN);
+  let cursor = (fixedSegments[0] ?? "").length;
+  let normalized = fixedSegments[0] ?? "";
+
+  for (let index = 0; index < placeholders.length; index += 1) {
+    const nextFixed = fixedSegments[index + 1] ?? "";
+    const nextIndex = nextFixed
+      ? candidate.indexOf(nextFixed, cursor)
+      : candidate.length;
+    const replacement = candidate.slice(cursor, nextIndex);
+    const placeholder = placeholders[index];
+    const nextReplacement =
+      placeholder && isStandaloneMaterialPlaceholder(source, placeholder)
+        ? replacement
+            .trim()
+            .split(/\n\s*\n/)
+            .flatMap(splitMaterialParagraph)
+            .filter(Boolean)
+            .join("\n\n")
+        : replacement;
+
+    normalized += nextReplacement + nextFixed;
+    cursor = nextIndex + nextFixed.length;
+  }
+
+  return normalized;
+}
+
 function assertMaterialCompletionPreservesDraft(
   source: string,
   candidate: string
@@ -621,7 +701,9 @@ export async function completeDraftMaterials(
     label: "正文素材补充完成",
   });
 
-  const normalizedContent = buildBasicMarkdownFallback(completed.content);
+  const normalizedContent = buildBasicMarkdownFallback(
+    normalizeMaterialCompletionRhythm(input.draft.content, completed.content)
+  );
 
   return completeDraftMaterialsResponseSchema.parse({
     draft: {

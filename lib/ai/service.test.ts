@@ -1542,6 +1542,59 @@ body: 模块必须解决阅读任务。
     expect(result.draft.content).toContain("低成本方案验证完整链路");
   });
 
+  it("adds breathing room to standalone material replacements without breaking inline replacements", async () => {
+    vi.stubEnv("AI_PROVIDER", "mock");
+    const standalonePlaceholder =
+      "【💡需要你补充：补充一个有公开资料支持的完整案例】";
+    const inlinePlaceholder = "【💡需要你补充：补充一个简短术语】";
+    const sourceContent = [
+      "## 开头",
+      "**原始重点。**",
+      standalonePlaceholder,
+      `行内说明：${inlinePlaceholder}，到这里结束。`,
+      "收尾。",
+    ].join("\n\n");
+
+    vi.spyOn(mockAIProvider, "completeDraftMaterials").mockResolvedValueOnce({
+      drafts: [
+        {
+          id: "draft-a",
+          label: "原始版",
+          content: [
+            "## 开头",
+            "**原始重点。**",
+            "第一句说明背景。第二句补充动作。第三句给出结果。第四句回到判断。",
+            "行内说明：一个简短但完整的反馈闭环术语，到这里结束。",
+            "收尾。",
+          ].join("\n\n"),
+        },
+      ],
+    });
+
+    const result = await completeDraftMaterials({
+      draft: {
+        id: "draft-a",
+        label: "原始版",
+        content: sourceContent,
+      },
+      topicLabel: "AI 产品工程顺序",
+      topicAngle: "先验证主流程",
+      coreViewpoint: "先验证再升级模型。",
+      briefObjective: "解释工程取舍。",
+      briefAudience: "AI 产品经理",
+      briefPersona: "务实的产品负责人",
+      outline: createDraftInput().outline,
+      searchContext: null,
+    });
+
+    expect(result.draft.content).toContain(
+      "第一句说明背景。第二句补充动作。\n\n第三句给出结果。第四句回到判断。"
+    );
+    expect(result.draft.content).toContain(
+      "行内说明：一个简短但完整的反馈闭环术语，到这里结束。"
+    );
+  });
+
   it("normalizes the completed material draft with local Markdown structure", async () => {
     vi.stubEnv("AI_PROVIDER", "mock");
     const sourceContent = [

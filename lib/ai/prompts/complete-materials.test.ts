@@ -58,6 +58,8 @@ describe("buildCompleteDraftMaterialsPrompt", () => {
     expect(prompt.userPrompt).toContain("再决定是否增加模型成本");
     expect(prompt.userPrompt).toContain("补充我的亲身客户案例");
     expect(prompt.userPrompt).toContain("保持 Markdown 结构");
+    expect(prompt.userPrompt).toContain("每段 1-2 句");
+    expect(prompt.userPrompt).toContain("空行分隔");
     expect(prompt.outputSchema).toBeDefined();
   });
 

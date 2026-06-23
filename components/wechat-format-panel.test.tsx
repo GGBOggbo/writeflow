@@ -23,6 +23,43 @@ describe("WechatFormatPanel", () => {
     expect(screen.queryByText(/消耗 1 积分/)).toBeNull();
   });
 
+  it("presents the default preview as Writeflow blue and keeps Claude warm", async () => {
+    const user = userEvent.setup();
+    render(
+      <WechatFormatPanel
+        draftLabel="原始版"
+        content="## 标题\n\n正文"
+      />
+    );
+
+    const writeflowButton = screen.getByRole("button", {
+      name: "Writeflow 蓝调",
+    });
+    const claudeButton = screen.getByRole("button", {
+      name: "Claude 暖纸",
+    });
+    const previewCanvas = screen.getByTestId("wechat-preview-canvas");
+
+    expect(screen.queryByRole("button", { name: "微信原生" })).toBeNull();
+    expect(writeflowButton).toHaveAttribute("aria-pressed", "true");
+    expect(writeflowButton).toHaveClass(
+      "border-[#5f7993]",
+      "bg-[#eef2f6]",
+      "text-[#233044]"
+    );
+    expect(previewCanvas).toHaveStyle({ background: "#f3f5f7" });
+
+    await user.click(claudeButton);
+
+    expect(claudeButton).toHaveAttribute("aria-pressed", "true");
+    expect(claudeButton).toHaveClass(
+      "border-[#c96442]",
+      "bg-[#fdf0ea]",
+      "text-[#9f482f]"
+    );
+    expect(previewCanvas).toHaveStyle({ background: "#f5f4ed" });
+  });
+
   it("does not expose AI formatting or theme selection controls", () => {
     render(
       <WechatFormatPanel

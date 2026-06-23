@@ -8,8 +8,13 @@ import { CLAUDE_TOKENS } from "@/lib/formatting/format-tokens";
 type PreviewTheme = "wechat-native" | "claude";
 
 const THEME_LABELS: Record<PreviewTheme, string> = {
-  "wechat-native": "微信原生",
+  "wechat-native": "Writeflow 蓝调",
   claude: "Claude 暖纸",
+};
+
+const THEME_ACTIVE_CLASSES: Record<PreviewTheme, string> = {
+  "wechat-native": "border-[#5f7993] bg-[#eef2f6] text-[#233044]",
+  claude: "border-[#c96442] bg-[#fdf0ea] text-[#9f482f]",
 };
 
 const MATERIAL_PLACEHOLDER_PATTERN = /【💡需要你补充：[^】]+】/;
@@ -59,8 +64,9 @@ export function WechatFormatPanel({
       className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-stone-200 bg-white"
     >
       <div
+        data-testid="wechat-preview-canvas"
         className="flex min-h-0 flex-1 flex-col p-4 sm:p-5"
-        style={{ background: theme === "claude" ? "#f5f4ed" : "#f1efeb" }}
+        style={{ background: theme === "claude" ? "#f5f4ed" : "#f3f5f7" }}
       >
         <div
           data-testid="wechat-preview-layout"
@@ -88,7 +94,7 @@ export function WechatFormatPanel({
                     className={[
                       "rounded-full border px-2.5 py-1 text-[10px] font-semibold transition",
                       theme === id
-                        ? "border-[#c96442] bg-[#fdf0ea] text-[#9f482f]"
+                        ? THEME_ACTIVE_CLASSES[id]
                         : "border-stone-300 bg-white text-stone-500 hover:bg-stone-50",
                     ].join(" ")}
                     onClick={() => setTheme(id)}

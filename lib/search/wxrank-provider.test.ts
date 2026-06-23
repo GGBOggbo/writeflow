@@ -496,7 +496,7 @@ describe("wxrank search provider", () => {
     }
   });
 
-  it("deep-dives exactly eight selected articles with html and comments", async () => {
+  it("deep-dives four selected articles and fetches comments for two", async () => {
     vi.stubEnv("LOG_LEVEL", "debug");
     const capture = capturePinoOutput();
     const { client, calls } = createFakeClient({
@@ -527,10 +527,10 @@ describe("wxrank search provider", () => {
       progress.push(event)
     );
 
-    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(8);
-    expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(8);
-    expect(results.filter((result) => result.articleHtml)).toHaveLength(8);
-    expect(results.filter((result) => result.comments?.length)).toHaveLength(8);
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(4);
+    expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(2);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(4);
+    expect(results.filter((result) => result.comments?.length)).toHaveLength(2);
     expect(results.some((result) => result.url === "https://mp.weixin.qq.com/s/canonical-1"))
       .toBe(true);
     expect(results.find((result) => result.url === "https://mp.weixin.qq.com/s/canonical-1")
@@ -541,7 +541,7 @@ describe("wxrank search provider", () => {
       ]);
     expect(calls.filter((call) => call.endpoint === "getcm").map((call) => call.input))
       .toEqual(
-        Array.from({ length: 8 }, (_, index) => ({
+        Array.from({ length: 2 }, (_, index) => ({
           url: `https://mp.weixin.qq.com/s/canonical-${index + 1}`,
           commentId: `comment-${index + 1}`,
         }))
@@ -573,9 +573,9 @@ describe("wxrank search provider", () => {
 
     const results = await createProvider(client).search(baseInput());
 
-    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(8);
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(4);
     expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(0);
-    expect(results.filter((result) => result.articleHtml)).toHaveLength(8);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(4);
     const logs = capture.output();
     capture.restore();
     expect(logs).toContain('"event":"search.comments.skipped"');
@@ -600,9 +600,9 @@ describe("wxrank search provider", () => {
     const results = await createProvider(client).search(baseInput());
 
     expect(results).toHaveLength(8);
-    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(8);
+    expect(calls.filter((call) => call.endpoint === "artinfo")).toHaveLength(4);
     expect(calls.filter((call) => call.endpoint === "getcm")).toHaveLength(1);
-    expect(results.filter((result) => result.articleHtml)).toHaveLength(7);
+    expect(results.filter((result) => result.articleHtml)).toHaveLength(3);
     expect(results.filter((result) => result.comments?.length)).toHaveLength(0);
     expect(results.map((result) => result.title)).toContain("Claude 神话模型实测 1");
     const warnings = capture.output();

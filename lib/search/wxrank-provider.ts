@@ -29,7 +29,8 @@ import type { WxrankHistoricalArticle as RankedHistoricalArticle } from "./wxran
 
 const QUALIFIED_HISTORY_THRESHOLD = 5;
 const RESULT_LIMIT = 8;
-const DEFAULT_DEEP_DIVE_LIMIT = 8;
+const DEFAULT_DEEP_DIVE_LIMIT = 4;
+const DEFAULT_COMMENT_ARTICLE_LIMIT = 2;
 
 function logKeyword(value: string) {
   return value.replace(/[\n\r\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
@@ -381,7 +382,8 @@ function applyArticleInfo(result: SearchResult, articleInfo: WxrankArticleInfo) 
 
 async function enrichOneDeepDiveArticle(
   client: WxrankClient,
-  result: SearchResult
+  result: SearchResult,
+  includeComments: boolean
 ): Promise<{ originalUrl: string; result: SearchResult }> {
   const originalUrl = result.url;
   const title = logText(result.title);
@@ -400,7 +402,7 @@ async function enrichOneDeepDiveArticle(
       elapsedMs: Date.now() - articleInfoStartedAt,
     });
 
-    if (commentId) {
+    if (commentId && includeComments) {
       const commentsStartedAt = Date.now();
       try {
         const rawComments = await client.getArticleComments({
@@ -437,7 +439,7 @@ async function enrichOneDeepDiveArticle(
         event: "search.comments.skipped",
         endpoint: "getcm",
         title,
-        reason: "missing-comment-id",
+        reason: commentId ? "comment-article-limit" : "missing-comment-id",
       });
     }
 
@@ -474,6 +476,10 @@ async function enrichDeepDiveArticles(
     "WXRANK_DEEP_DIVE_LIMIT",
     DEFAULT_DEEP_DIVE_LIMIT
   );
+  const commentArticleLimit = getPositiveEnvInt(
+    "WXRANK_COMMENT_ARTICLE_LIMIT",
+    DEFAULT_COMMENT_ARTICLE_LIMIT
+  );
   const candidates = selectDeepDiveArticles(results, deepDiveLimit);
   if (candidates.length === 0) {
     return results;
@@ -503,8 +509,14 @@ async function enrichDeepDiveArticles(
   });
 
   const replacements = [];
-  for (const candidate of candidates) {
-    replacements.push(await enrichOneDeepDiveArticle(client, candidate));
+  for (const [index, candidate] of candidates.entries()) {
+    replacements.push(
+      await enrichOneDeepDiveArticle(
+        client,
+        candidate,
+        index < commentArticleLimit
+      )
+    );
   }
 
   onProgress?.({
