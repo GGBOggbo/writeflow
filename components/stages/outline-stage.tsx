@@ -50,9 +50,6 @@ export function OutlineStage() {
                   <span className="rounded-full bg-[#eaf1f8] px-3 py-1 text-[11px] font-medium text-stone-700">
                     节点角色：{section.sectionRole}
                   </span>
-                  <span className="rounded-full bg-[#f4f7fb] px-3 py-1 text-[11px] font-medium text-stone-600">
-                    继续可写
-                  </span>
                 </div>
               </article>
             ))}

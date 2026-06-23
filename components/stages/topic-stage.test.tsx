@@ -1,5 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { generateBrief } from "@/lib/ai/client";
 import type { WorkflowState } from "@/types/workflow";
 import { WorkflowProvider } from "../workflow-context";
 import { TopicStage } from "./topic-stage";
@@ -82,5 +84,27 @@ describe("TopicStage", () => {
     expect(
       screen.getByText("怀旧情绪和心理学热点结合，容易引发收藏与转发。")
     ).toBeInTheDocument();
+  });
+
+  it("does not show fixed readiness labels on every topic", async () => {
+    renderWithState(<TopicStage />, topicSelectState);
+
+    expect(await screen.findByText("选题 1")).toBeInTheDocument();
+    expect(screen.queryByText(/适合继续展开/)).not.toBeInTheDocument();
+    expect(screen.queryByText("可进入 Brief")).not.toBeInTheDocument();
+  });
+
+  it("says selecting a topic generates a strategy brief instead of an outline", async () => {
+    vi.mocked(generateBrief).mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
+    renderWithState(<TopicStage />, topicSelectState);
+
+    await user.click(await screen.findByRole("button", { name: "选择 选题 1" }));
+
+    expect(
+      await screen.findByText("正在根据这个方向生成写作策略单...")
+    ).toBeInTheDocument();
+    expect(screen.getByText("正在生成写作策略单...")).toBeInTheDocument();
+    expect(screen.queryByText("正在生成写作提纲...")).not.toBeInTheDocument();
   });
 });

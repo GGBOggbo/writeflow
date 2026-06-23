@@ -16,11 +16,11 @@ export function TopicStage() {
           选题会：选出最值得展开的切口
         </h2>
         <p className="editorial-copy mt-3 max-w-3xl text-sm text-stone-600">
-          先不要急着生成正文。挑出最值得写、最容易打动目标读者、也最适合继续展开的那个方向。
+          先不要急着生成正文。挑出最值得写、最容易打动目标读者的那个方向。
         </p>
         {loading && state.selectedTopicId ? (
           <div className="mt-4 inline-flex items-center rounded-full bg-[#233044] px-4 py-2 text-sm font-medium text-stone-50">
-            正在根据这个方向生成写作提纲...
+            正在根据这个方向生成写作策略单...
           </div>
         ) : null}
       </div>
@@ -108,27 +108,9 @@ export function TopicStage() {
                   </dd>
                 </div>
               </dl>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <span
-                  className={[
-                    "inline-flex rounded-full px-3 py-1 text-[11px] font-medium",
-                    isSelected ? "bg-white/88 text-[#233044]" : "bg-[#eef3f8] text-stone-700",
-                  ].join(" ")}
-                >
-                  适合继续展开
-                </span>
-                <span
-                  className={[
-                    "inline-flex rounded-full px-3 py-1 text-[11px] font-medium",
-                    isSelected ? "bg-white/88 text-stone-700" : "bg-[#f4f7fb] text-stone-600",
-                  ].join(" ")}
-                >
-                  可进入 Brief
-                </span>
-              </div>
               {isWaiting ? (
                 <p className="mt-4 text-sm font-medium text-stone-800">
-                  正在生成写作提纲...
+                  正在生成写作策略单...
                 </p>
               ) : null}
             </button>
