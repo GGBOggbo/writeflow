@@ -28,69 +28,132 @@ describe("SqliteCreditStore", () => {
   });
 
   it("keeps administrators unlimited", async () => {
-    await expect(store.reserve("admin-user", "topics", "op-1")).resolves.toEqual({
+    await expect(
+      store.reserve("admin-user", "topics", "op-1", "workflow-a")
+    ).resolves.toEqual({
       unlimited: true,
       remaining: null,
     });
   });
 
-  it("reserves, consumes, and refunds with SQLite transactions", async () => {
-    await expect(store.reserve("regular-user", "draft", "op-1")).resolves.toEqual({
+  it("makes the first successful generation in a workflow stage free", async () => {
+    await expect(
+      store.reserve("regular-user", "topics", "op-1", "workflow-a")
+    ).resolves.toEqual({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
     });
 
     await expect(store.consume("regular-user", "op-1")).resolves.toEqual({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
+    });
+  });
+
+  it("charges 0.05 credits for regenerating the same workflow stage", async () => {
+    await store.reserve("regular-user", "topics", "op-1", "workflow-a");
+    await store.consume("regular-user", "op-1");
+
+    await expect(
+      store.reserve("regular-user", "topics", "op-2", "workflow-a")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 4.95,
     });
 
-    await expect(store.reserve("regular-user", "meta", "op-2")).resolves.toEqual({
+    await expect(store.consume("regular-user", "op-2")).resolves.toEqual({
       unlimited: false,
-      remaining: 3,
+      remaining: 4.95,
     });
-    await expect(store.refund("regular-user", "op-2")).resolves.toEqual({
+  });
+
+  it("keeps different stages and workflows free for their first success", async () => {
+    await store.reserve("regular-user", "topics", "op-1", "workflow-a");
+    await store.consume("regular-user", "op-1");
+
+    await expect(
+      store.reserve("regular-user", "brief", "op-2", "workflow-a")
+    ).resolves.toEqual({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
     });
-    await expect(store.refund("regular-user", "op-2")).resolves.toEqual({
+
+    await expect(
+      store.reserve("regular-user", "topics", "op-3", "workflow-b")
+    ).resolves.toEqual({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
     });
   });
 
   it("rejects duplicate pending or consumed operations", async () => {
-    await store.reserve("regular-user", "topics", "op-1");
+    await store.reserve("regular-user", "topics", "op-1", "workflow-a");
 
-    await expect(store.reserve("regular-user", "topics", "op-1")).rejects.toThrow(
-      CreditConflictError
-    );
+    await expect(
+      store.reserve("regular-user", "topics", "op-1", "workflow-a")
+    ).rejects.toThrow(CreditConflictError);
 
     await store.consume("regular-user", "op-1");
 
-    await expect(store.reserve("regular-user", "topics", "op-1")).rejects.toThrow(
-      CreditConflictError
-    );
+    await expect(
+      store.reserve("regular-user", "topics", "op-1", "workflow-a")
+    ).rejects.toThrow(CreditConflictError);
   });
 
   it("allows retrying the same refunded operation id for the same stage", async () => {
-    await store.reserve("regular-user", "outline", "op-1");
+    await store.reserve("regular-user", "outline", "op-1", "workflow-a");
     await store.refund("regular-user", "op-1");
 
-    await expect(store.reserve("regular-user", "outline", "op-1")).resolves.toEqual({
+    await expect(
+      store.reserve("regular-user", "outline", "op-1", "workflow-a")
+    ).resolves.toEqual({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
     });
   });
 
-  it("rejects new operations when local credits run out", async () => {
-    for (let index = 0; index < 5; index += 1) {
-      await store.reserve("regular-user", "brief", `op-${index}`);
-      await store.consume("regular-user", `op-${index}`);
-    }
+  it("lets a zero-balance user run a first free generation but rejects regeneration", async () => {
+    await store.reserve("regular-user", "topics", "op-1", "workflow-a");
+    await store.consume("regular-user", "op-1");
+    database
+      .prepare('UPDATE workflow_credit_accounts SET balance = 0 WHERE "userId" = ?')
+      .run("regular-user");
 
-    await expect(store.reserve("regular-user", "brief", "op-6")).rejects.toThrow(
-      InsufficientCreditsError
-    );
+    await expect(
+      store.reserve("regular-user", "brief", "op-2", "workflow-a")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 0,
+    });
+
+    await expect(
+      store.reserve("regular-user", "topics", "op-3", "workflow-a")
+    ).rejects.toThrow(InsufficientCreditsError);
+  });
+
+  it("refunds only the reserved regeneration cost and reuses a refunded operation id", async () => {
+    await store.reserve("regular-user", "draft", "op-1", "workflow-a");
+    await store.consume("regular-user", "op-1");
+    await store.reserve("regular-user", "draft", "op-2", "workflow-a");
+
+    await expect(store.refund("regular-user", "op-2")).resolves.toEqual({
+      unlimited: false,
+      remaining: 5,
+    });
+
+    await expect(
+      store.reserve("regular-user", "draft", "op-2", "workflow-a")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 4.95,
+    });
+  });
+
+  it("rejects concurrent generation for the same workflow stage", async () => {
+    await store.reserve("regular-user", "outline", "op-1", "workflow-a");
+
+    await expect(
+      store.reserve("regular-user", "outline", "op-2", "workflow-a")
+    ).rejects.toThrow(CreditConflictError);
   });
 });

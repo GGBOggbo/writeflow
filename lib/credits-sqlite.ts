@@ -4,14 +4,19 @@ import {
   AI_STAGES,
   CREDIT_COST_PER_GENERATION,
   CreditConflictError,
+  FREE_GENERATION_CREDIT_COST_UNITS,
   INITIAL_CREDITS,
   InsufficientCreditsError,
+  REGENERATION_CREDIT_COST_UNITS,
+  creditUnitsToAmount,
   type AiStage,
 } from "./credits-core";
 
 type CreditOperationRow = {
   stage: AiStage;
+  cost: number;
   status: "pending" | "consumed" | "refunded";
+  workflowId: string | null;
 };
 
 export class SqliteCreditStore {
@@ -23,6 +28,12 @@ export class SqliteCreditStore {
     if (this.initialized) return;
 
     this.database.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_schema_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS workflow_credit_accounts (
         "userId" TEXT PRIMARY KEY,
         balance INTEGER NOT NULL DEFAULT ${INITIAL_CREDITS}
@@ -34,6 +45,7 @@ export class SqliteCreditStore {
       CREATE TABLE IF NOT EXISTS workflow_credit_operations (
         "userId" TEXT NOT NULL,
         "operationId" TEXT NOT NULL,
+        "workflowId" TEXT,
         stage TEXT NOT NULL,
         cost INTEGER NOT NULL DEFAULT ${CREDIT_COST_PER_GENERATION},
         status TEXT NOT NULL CHECK (status IN ('pending', 'consumed', 'refunded')),
@@ -42,6 +54,29 @@ export class SqliteCreditStore {
         PRIMARY KEY ("userId", "operationId")
       );
     `);
+
+    const columns = this.database
+      .prepare("PRAGMA table_info(workflow_credit_operations)")
+      .all() as Array<{ name: string }>;
+
+    if (!columns.some((column) => column.name === "workflowId")) {
+      this.database.exec(
+        'ALTER TABLE workflow_credit_operations ADD COLUMN "workflowId" TEXT;'
+      );
+    }
+
+    const marker = this.database
+      .prepare("SELECT value FROM workflow_schema_meta WHERE key = ?")
+      .get("credit-units-v1");
+
+    if (!marker) {
+      this.database.exec(`
+        UPDATE workflow_credit_accounts SET balance = balance * 100;
+        UPDATE workflow_credit_operations SET cost = cost * 100;
+        INSERT INTO workflow_schema_meta (key, value, "updatedAt")
+        VALUES ('credit-units-v1', 'applied', CURRENT_TIMESTAMP);
+      `);
+    }
 
     this.initialized = true;
   }
@@ -81,7 +116,7 @@ export class SqliteCreditStore {
       throw new CreditConflictError("未找到积分账户。");
     }
 
-    return { unlimited: false, remaining: row.balance };
+    return { unlimited: false, remaining: creditUnitsToAmount(row.balance) };
   }
 
   private transaction<T>(callback: () => T): T {
@@ -110,7 +145,8 @@ export class SqliteCreditStore {
   async reserve(
     userId: string,
     stage: AiStage,
-    operationId: string
+    operationId: string,
+    workflowId: string
   ): Promise<CreditBalance> {
     this.ensureTables();
     assertKnownStage(stage);
@@ -122,30 +158,43 @@ export class SqliteCreditStore {
     return this.transaction(() => {
       this.ensureAccount(userId);
 
-      const claimed = this.database
+      this.database
+        .prepare('SELECT balance FROM workflow_credit_accounts WHERE "userId" = ?')
+        .get(userId);
+
+      const row = this.database
         .prepare(
-          `INSERT INTO workflow_credit_operations
-            ("userId", "operationId", stage, cost, status, "createdAt", "updatedAt")
-           VALUES (?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-           ON CONFLICT("userId", "operationId") DO NOTHING`
+          `SELECT stage, cost, status, "workflowId"
+           FROM workflow_credit_operations
+           WHERE "userId" = ? AND "operationId" = ?`
         )
-        .run(userId, operationId, stage, CREDIT_COST_PER_GENERATION);
+        .get(userId, operationId) as CreditOperationRow | undefined;
 
-      if (claimed.changes !== 1) {
-        const row = this.database
-          .prepare(
-            `SELECT stage, status
-             FROM workflow_credit_operations
-             WHERE "userId" = ? AND "operationId" = ?`
-          )
-          .get(userId, operationId) as CreditOperationRow | undefined;
+      let cost = FREE_GENERATION_CREDIT_COST_UNITS;
 
-        if (!row || row.stage !== stage) {
+      if (row) {
+        if (row.stage !== stage || row.workflowId !== workflowId) {
           throw new CreditConflictError("该请求标识已被其他生成步骤使用。");
         }
 
         if (row.status !== "refunded") {
           throw new CreditConflictError();
+        }
+
+        const pending = this.database
+          .prepare(
+            `SELECT 1 FROM workflow_credit_operations
+             WHERE "userId" = ?
+               AND "workflowId" = ?
+               AND stage = ?
+               AND status = 'pending'
+               AND "operationId" <> ?
+             LIMIT 1`
+          )
+          .get(userId, workflowId, stage, operationId);
+
+        if (pending) {
+          throw new CreditConflictError("该步骤已有生成请求正在进行。");
         }
 
         const retried = this.database
@@ -159,18 +208,54 @@ export class SqliteCreditStore {
         if (retried.changes !== 1) {
           throw new CreditConflictError();
         }
+
+        cost = row.cost;
+      } else {
+        const pending = this.database
+          .prepare(
+            `SELECT 1 FROM workflow_credit_operations
+             WHERE "userId" = ? AND "workflowId" = ? AND stage = ? AND status = 'pending'
+             LIMIT 1`
+          )
+          .get(userId, workflowId, stage);
+
+        if (pending) {
+          throw new CreditConflictError("该步骤已有生成请求正在进行。");
+        }
+
+        const consumed = this.database
+          .prepare(
+            `SELECT 1 FROM workflow_credit_operations
+             WHERE "userId" = ? AND "workflowId" = ? AND stage = ? AND status = 'consumed'
+             LIMIT 1`
+          )
+          .get(userId, workflowId, stage);
+
+        cost = consumed
+          ? REGENERATION_CREDIT_COST_UNITS
+          : FREE_GENERATION_CREDIT_COST_UNITS;
+
+        this.database
+          .prepare(
+            `INSERT INTO workflow_credit_operations
+              ("userId", "operationId", "workflowId", stage, cost, status, "createdAt", "updatedAt")
+             VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+          )
+          .run(userId, operationId, workflowId, stage, cost);
       }
 
-      const deduction = this.database
-        .prepare(
-          `UPDATE workflow_credit_accounts
-           SET balance = balance - ?, "updatedAt" = CURRENT_TIMESTAMP
-           WHERE "userId" = ? AND balance >= ?`
-        )
-        .run(CREDIT_COST_PER_GENERATION, userId, CREDIT_COST_PER_GENERATION);
+      if (cost > 0) {
+        const deduction = this.database
+          .prepare(
+            `UPDATE workflow_credit_accounts
+             SET balance = balance - ?, "updatedAt" = CURRENT_TIMESTAMP
+             WHERE "userId" = ? AND balance >= ?`
+          )
+          .run(cost, userId, cost);
 
-      if (deduction.changes !== 1) {
-        throw new InsufficientCreditsError();
+        if (deduction.changes !== 1) {
+          throw new InsufficientCreditsError();
+        }
       }
 
       return this.getRegularBalance(userId);

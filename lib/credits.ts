@@ -30,7 +30,9 @@ export {
 
 type CreditOperationRow = {
   stage: AiStage;
+  cost: number;
   status: "pending" | "consumed" | "refunded";
+  workflowId: string | null;
 };
 
 type Queryable = Pool | PoolClient;
@@ -47,6 +49,12 @@ export class CreditStore {
   private async ensureTables() {
     if (this.initialized) return;
     await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS workflow_schema_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS workflow_credit_accounts (
         "userId" TEXT PRIMARY KEY,
         balance INTEGER NOT NULL DEFAULT ${INITIAL_CREDITS}
@@ -58,6 +66,7 @@ export class CreditStore {
       CREATE TABLE IF NOT EXISTS workflow_credit_operations (
         "userId" TEXT NOT NULL,
         "operationId" TEXT NOT NULL,
+        "workflowId" TEXT,
         stage TEXT NOT NULL,
         cost INTEGER NOT NULL DEFAULT ${CREDIT_COST_PER_GENERATION},
         status TEXT NOT NULL CHECK (status IN ('pending', 'consumed', 'refunded')),
@@ -65,6 +74,26 @@ export class CreditStore {
         "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY ("userId", "operationId")
       );
+
+      ALTER TABLE workflow_credit_operations
+        ADD COLUMN IF NOT EXISTS "workflowId" TEXT;
+      ALTER TABLE workflow_credit_accounts
+        ALTER COLUMN balance SET DEFAULT ${INITIAL_CREDITS};
+      ALTER TABLE workflow_credit_operations
+        ALTER COLUMN cost SET DEFAULT ${CREDIT_COST_PER_GENERATION};
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM workflow_schema_meta WHERE key = 'credit-units-v1'
+        ) THEN
+          UPDATE workflow_credit_accounts SET balance = balance * 100;
+          UPDATE workflow_credit_operations SET cost = cost * 100;
+          INSERT INTO workflow_schema_meta (key, value, "updatedAt")
+          VALUES ('credit-units-v1', 'applied', NOW())
+          ON CONFLICT (key) DO NOTHING;
+        END IF;
+      END $$;
     `);
     this.initialized = true;
   }
@@ -103,7 +132,10 @@ export class CreditStore {
       [userId]
     );
 
-    return { unlimited: false, remaining: result.rows[0].balance };
+    return {
+      unlimited: false,
+      remaining: creditUnitsToAmount(result.rows[0].balance),
+    };
   }
 
   private async transaction<T>(
@@ -138,7 +170,8 @@ export class CreditStore {
   async reserve(
     userId: string,
     stage: AiStage,
-    operationId: string
+    operationId: string,
+    workflowId: string
   ): Promise<CreditBalance> {
     await this.ensureTables();
 
@@ -149,27 +182,27 @@ export class CreditStore {
     return this.transaction(async (client) => {
       await this.ensureAccount(userId, client);
 
-      const claimed = await client.query(
-        `INSERT INTO workflow_credit_operations
-          ("userId", "operationId", stage, cost, status, "createdAt", "updatedAt")
-         VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())
-         ON CONFLICT ("userId", "operationId") DO NOTHING
-         RETURNING stage, status`,
-        [userId, operationId, stage, CREDIT_COST_PER_GENERATION]
+      await client.query(
+        `SELECT balance
+         FROM workflow_credit_accounts
+         WHERE "userId" = $1
+         FOR UPDATE`,
+        [userId]
       );
 
-      if (claimed.rowCount !== 1) {
-        const existing = await client.query(
-          `SELECT stage, status
-           FROM workflow_credit_operations
-           WHERE "userId" = $1 AND "operationId" = $2
-           FOR UPDATE`,
-          [userId, operationId]
-        );
+      const existing = await client.query(
+        `SELECT stage, status, cost, "workflowId"
+         FROM workflow_credit_operations
+         WHERE "userId" = $1 AND "operationId" = $2
+         FOR UPDATE`,
+        [userId, operationId]
+      );
 
-        const row = existing.rows[0] as CreditOperationRow | undefined;
+      let cost = FREE_GENERATION_CREDIT_COST_UNITS;
+      const row = existing.rows[0] as CreditOperationRow | undefined;
 
-        if (!row || row.stage !== stage) {
+      if (row) {
+        if (row.stage !== stage || row.workflowId !== workflowId) {
           throw new CreditConflictError(
             "该请求标识已被其他生成步骤使用。"
           );
@@ -179,35 +212,81 @@ export class CreditStore {
           throw new CreditConflictError();
         }
 
+        const pending = await client.query(
+          `SELECT 1 FROM workflow_credit_operations
+           WHERE "userId" = $1
+             AND "workflowId" = $2
+             AND stage = $3
+             AND status = 'pending'
+             AND "operationId" <> $4
+           LIMIT 1`,
+          [userId, workflowId, stage, operationId]
+        );
+
+        if (pending.rowCount > 0) {
+          throw new CreditConflictError("该步骤已有生成请求正在进行。");
+        }
+
         const retried = await client.query(
-        `UPDATE workflow_credit_operations
-         SET status = 'pending', "updatedAt" = NOW()
-         WHERE "userId" = $1 AND "operationId" = $2 AND status = 'refunded'
-         RETURNING status`,
+          `UPDATE workflow_credit_operations
+           SET status = 'pending', "updatedAt" = NOW()
+           WHERE "userId" = $1 AND "operationId" = $2 AND status = 'refunded'
+           RETURNING status`,
           [userId, operationId]
         );
 
         if (retried.rowCount !== 1) {
           throw new CreditConflictError();
         }
+
+        cost = row.cost;
+      } else {
+        const pending = await client.query(
+          `SELECT 1 FROM workflow_credit_operations
+           WHERE "userId" = $1 AND "workflowId" = $2 AND stage = $3 AND status = 'pending'
+           LIMIT 1`,
+          [userId, workflowId, stage]
+        );
+
+        if (pending.rowCount > 0) {
+          throw new CreditConflictError("该步骤已有生成请求正在进行。");
+        }
+
+        const consumed = await client.query(
+          `SELECT 1 FROM workflow_credit_operations
+           WHERE "userId" = $1 AND "workflowId" = $2 AND stage = $3 AND status = 'consumed'
+           LIMIT 1`,
+          [userId, workflowId, stage]
+        );
+
+        cost =
+          consumed.rowCount > 0
+            ? REGENERATION_CREDIT_COST_UNITS
+            : FREE_GENERATION_CREDIT_COST_UNITS;
+
+        await client.query(
+          `INSERT INTO workflow_credit_operations
+            ("userId", "operationId", "workflowId", stage, cost, status, "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())`,
+          [userId, operationId, workflowId, stage, cost]
+        );
       }
 
-      const deduction = await client.query(
-        `UPDATE workflow_credit_accounts
-         SET balance = balance - $1, "updatedAt" = NOW()
-         WHERE "userId" = $2 AND balance >= $1
-         RETURNING balance`,
-        [CREDIT_COST_PER_GENERATION, userId]
-      );
+      if (cost > 0) {
+        const deduction = await client.query(
+          `UPDATE workflow_credit_accounts
+           SET balance = balance - $1, "updatedAt" = NOW()
+           WHERE "userId" = $2 AND balance >= $1
+           RETURNING balance`,
+          [cost, userId]
+        );
 
-      if (deduction.rowCount !== 1) {
-        throw new InsufficientCreditsError();
+        if (deduction.rowCount !== 1) {
+          throw new InsufficientCreditsError();
+        }
       }
 
-      return {
-        unlimited: false,
-        remaining: deduction.rows[0].balance,
-      };
+      return this.getRegularBalance(userId, client);
     });
   }
 
@@ -265,7 +344,7 @@ export class CreditStore {
 
         return {
           unlimited: false,
-          remaining: balance.rows[0].balance,
+          remaining: creditUnitsToAmount(balance.rows[0].balance),
         };
       }
 

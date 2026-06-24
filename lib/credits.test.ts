@@ -18,14 +18,14 @@ class FakePool {
   private accounts: Map<string, number> = new Map();
   private operations: Map<
     string,
-    { stage: string; cost: number; status: string }
+    { stage: string; cost: number; status: string; workflowId: string | null }
   > = new Map();
   private transactionSnapshot:
     | {
         accounts: Map<string, number>;
         operations: Map<
           string,
-          { stage: string; cost: number; status: string }
+          { stage: string; cost: number; status: string; workflowId: string | null }
         >;
       }
     | undefined;
@@ -33,6 +33,10 @@ class FakePool {
 
   setUserRole(userId: string, role: string) {
     this.users.set(userId, role);
+  }
+
+  setBalance(userId: string, balance: number) {
+    this.accounts.set(userId, balance);
   }
 
   async connect() {
@@ -85,15 +89,47 @@ class FakePool {
       return { rows: [{ balance }], rowCount: 1 };
     }
 
-    // SELECT stage, status FROM workflow_credit_operations WHERE ...
+    // SELECT 1 FROM workflow_credit_operations WHERE ... status = 'pending'/'consumed'
+    if (/SELECT 1 FROM workflow_credit_operations/i.test(s)) {
+      const userId = params![0] as string;
+      const workflowId = params![1] as string;
+      const stage = params![2] as string;
+      const excludedOperationId = params![3] as string | undefined;
+      const status = s.match(/status = '(\w+)'/i)?.[1];
+      const found = [...this.operations.entries()].some(
+        ([key, op]) => {
+          const [operationUserId, operationId] = key.split(":");
+          return (
+            operationUserId === userId &&
+            operationId !== excludedOperationId &&
+          op.workflowId === workflowId &&
+          op.stage === stage &&
+            op.status === status
+          );
+        }
+      );
+      return found
+        ? { rows: [{ "?column?": 1 }], rowCount: 1 }
+        : { rows: [], rowCount: 0 };
+    }
+
+    // SELECT stage, status, cost, "workflowId" FROM workflow_credit_operations WHERE ...
     if (
-      /SELECT stage, status FROM workflow_credit_operations/i.test(s)
+      /SELECT stage, status/i.test(s) &&
+      /FROM workflow_credit_operations/i.test(s)
     ) {
       const key = `${params![0]}:${params![1]}`;
       const op = this.operations.get(key);
       if (!op) return { rows: [], rowCount: 0 };
       return {
-        rows: [{ stage: op.stage, status: op.status }],
+        rows: [
+          {
+            stage: op.stage,
+            status: op.status,
+            cost: op.cost,
+            workflowId: op.workflowId,
+          },
+        ],
         rowCount: 1,
       };
     }
@@ -163,13 +199,15 @@ class FakePool {
 
       const userId = params![0] as string;
       const operationId = params![1] as string;
-      const stage = params![2] as string;
-      const cost = params![3] as number;
+      const hasWorkflowId = /"workflowId"/i.test(s);
+      const workflowId = hasWorkflowId ? (params![2] as string) : null;
+      const stage = hasWorkflowId ? (params![3] as string) : (params![2] as string);
+      const cost = hasWorkflowId ? (params![4] as number) : (params![3] as number);
       const key = `${userId}:${operationId}`;
       if (this.operations.has(key) && /ON CONFLICT/i.test(s)) {
         return { rows: [], rowCount: 0 };
       }
-      this.operations.set(key, { stage, cost, status: "pending" });
+      this.operations.set(key, { stage, cost, status: "pending", workflowId });
       return {
         rows: [{ stage, status: "pending" }],
         rowCount: 1,
@@ -214,69 +252,129 @@ describe("CreditStore", () => {
     });
 
     expect(
-      await store.reserve("admin-user", "topics", "admin-operation")
+      await store.reserve(
+        "admin-user",
+        "topics",
+        "admin-operation",
+        "workflow-a"
+      )
     ).toEqual({
       unlimited: true,
       remaining: null,
     });
   });
 
-  it("atomically reserves one credit for a generation", async () => {
-    expect(
-      await store.reserve("regular-user", "topics", "operation-1")
-    ).toEqual({
+  it("makes the first successful generation in a workflow stage free", async () => {
+    await expect(
+      store.reserve("regular-user", "topics", "operation-1", "workflow-a")
+    ).resolves.toEqual({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
     });
-    expect((await store.getBalance("regular-user")).remaining).toBe(4);
+
+    await expect(store.consume("regular-user", "operation-1")).resolves.toEqual({
+      unlimited: false,
+      remaining: 5,
+    });
   });
 
   it("rolls back the deduction when recording the operation fails", async () => {
     pool.failNextOperationInsert = true;
 
     await expect(
-      store.reserve("regular-user", "topics", "operation-1")
+      store.reserve("regular-user", "topics", "operation-1", "workflow-a")
     ).rejects.toThrow("simulated operation insert failure");
 
     expect((await store.getBalance("regular-user")).remaining).toBe(5);
   });
 
-  it("rejects a new operation when no credits remain", async () => {
-    for (let index = 0; index < 5; index += 1) {
-      await store.reserve("regular-user", "topics", `operation-${index}`);
-      await store.consume("regular-user", `operation-${index}`);
-    }
+  it("charges 0.05 credits for regenerating the same workflow stage", async () => {
+    await store.reserve("regular-user", "topics", "operation-1", "workflow-a");
+    await store.consume("regular-user", "operation-1");
 
     await expect(
-      store.reserve("regular-user", "topics", "operation-6")
+      store.reserve("regular-user", "topics", "operation-2", "workflow-a")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 4.95,
+    });
+
+    await expect(store.consume("regular-user", "operation-2")).resolves.toEqual({
+      unlimited: false,
+      remaining: 4.95,
+    });
+  });
+
+  it("keeps different stages and workflows free for their first success", async () => {
+    await store.reserve("regular-user", "topics", "operation-1", "workflow-a");
+    await store.consume("regular-user", "operation-1");
+
+    await expect(
+      store.reserve("regular-user", "brief", "operation-2", "workflow-a")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 5,
+    });
+
+    await expect(
+      store.reserve("regular-user", "topics", "operation-3", "workflow-b")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 5,
+    });
+  });
+
+  it("lets a zero-balance user run a first free generation but rejects regeneration", async () => {
+    await store.reserve("regular-user", "topics", "operation-1", "workflow-a");
+    await store.consume("regular-user", "operation-1");
+    pool.setBalance("regular-user", 0);
+
+    await expect(
+      store.reserve("regular-user", "brief", "operation-2", "workflow-a")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 0,
+    });
+
+    await expect(
+      store.reserve("regular-user", "topics", "operation-3", "workflow-a")
     ).rejects.toThrow(InsufficientCreditsError);
   });
 
   it("rejects a duplicate pending or consumed operation", async () => {
-    await store.reserve("regular-user", "topics", "operation-1");
+    await store.reserve("regular-user", "topics", "operation-1", "workflow-a");
 
     await expect(
-      store.reserve("regular-user", "topics", "operation-1")
+      store.reserve("regular-user", "topics", "operation-1", "workflow-a")
     ).rejects.toThrow(CreditConflictError);
 
     await store.consume("regular-user", "operation-1");
 
     await expect(
-      store.reserve("regular-user", "topics", "operation-1")
+      store.reserve("regular-user", "topics", "operation-1", "workflow-a")
     ).rejects.toThrow(CreditConflictError);
-    expect((await store.getBalance("regular-user")).remaining).toBe(4);
+    expect((await store.getBalance("regular-user")).remaining).toBe(5);
   });
 
   it("rejects reusing an operation id for another stage", async () => {
-    await store.reserve("regular-user", "topics", "operation-1");
+    await store.reserve("regular-user", "topics", "operation-1", "workflow-a");
 
     await expect(
-      store.reserve("regular-user", "draft", "operation-1")
+      store.reserve("regular-user", "draft", "operation-1", "workflow-a")
+    ).rejects.toThrow(CreditConflictError);
+  });
+
+  it("rejects reusing an operation id for another workflow", async () => {
+    await store.reserve("regular-user", "topics", "operation-1", "workflow-a");
+    await store.refund("regular-user", "operation-1");
+
+    await expect(
+      store.reserve("regular-user", "topics", "operation-1", "workflow-b")
     ).rejects.toThrow(CreditConflictError);
   });
 
   it("refunds a failed operation exactly once", async () => {
-    await store.reserve("regular-user", "draft", "operation-1");
+    await store.reserve("regular-user", "draft", "operation-1", "workflow-a");
 
     expect(
       (await store.refund("regular-user", "operation-1")).remaining
@@ -287,23 +385,49 @@ describe("CreditStore", () => {
   });
 
   it("allows a refunded operation to reserve again", async () => {
-    await store.reserve("regular-user", "meta", "operation-1");
+    await store.reserve("regular-user", "meta", "operation-1", "workflow-a");
     await store.refund("regular-user", "operation-1");
 
     expect(
-      await store.reserve("regular-user", "meta", "operation-1")
+      await store.reserve("regular-user", "meta", "operation-1", "workflow-a")
     ).toEqual({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
     });
   });
 
+  it("refunds only the reserved regeneration cost and reuses a refunded operation id", async () => {
+    await store.reserve("regular-user", "draft", "operation-1", "workflow-a");
+    await store.consume("regular-user", "operation-1");
+    await store.reserve("regular-user", "draft", "operation-2", "workflow-a");
+
+    await expect(store.refund("regular-user", "operation-2")).resolves.toEqual({
+      unlimited: false,
+      remaining: 5,
+    });
+
+    await expect(
+      store.reserve("regular-user", "draft", "operation-2", "workflow-a")
+    ).resolves.toEqual({
+      unlimited: false,
+      remaining: 4.95,
+    });
+  });
+
+  it("rejects concurrent generation for the same workflow stage", async () => {
+    await store.reserve("regular-user", "outline", "operation-1", "workflow-a");
+
+    await expect(
+      store.reserve("regular-user", "outline", "operation-2", "workflow-a")
+    ).rejects.toThrow(CreditConflictError);
+  });
+
   it("only consumes pending operations", async () => {
-    await store.reserve("regular-user", "outline", "operation-1");
+    await store.reserve("regular-user", "outline", "operation-1", "workflow-a");
 
     expect(
       (await store.consume("regular-user", "operation-1")).remaining
-    ).toBe(4);
+    ).toBe(5);
     await expect(store.consume("regular-user", "operation-1")).rejects.toThrow(
       CreditConflictError
     );
