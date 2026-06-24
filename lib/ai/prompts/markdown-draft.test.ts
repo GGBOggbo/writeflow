@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WRITEFLOW_MODULE_NAMES } from "@/lib/markdown/module-defs";
 import { buildMarkdownDraftPrompt } from "./markdown-draft";
 
 describe("buildMarkdownDraftPrompt", () => {
@@ -55,6 +56,27 @@ describe("buildMarkdownDraftPrompt", () => {
     expect(prompt.userPrompt).toContain("wf-section 编号必须从 01 开始");
     expect(prompt.userPrompt).toContain("禁止第一个 wf-section 使用 02");
     expect(prompt.userPrompt).toContain("不确定是否是章节时，用普通 Markdown ## 标题");
+  });
+
+  it("includes source-grounded decision cards for every Writeflow module", () => {
+    const prompt = buildMarkdownDraftPrompt("正文。");
+
+    expect(prompt.userPrompt).toContain("=== 33 个 wf 模块选择卡 ===");
+    for (const name of WRITEFLOW_MODULE_NAMES) {
+      expect(prompt.userPrompt).toContain(`${name}｜用：`);
+    }
+
+    expect(prompt.userPrompt).toContain(
+      "wf-section｜用：原文明确进入新章节"
+    );
+    expect(prompt.userPrompt).toContain(
+      "不用：普通转折、悬念句、金句或场景描写"
+    );
+    expect(prompt.userPrompt).toContain("易混：wf-chapter 是更大的篇章分割");
+    expect(prompt.userPrompt).toContain(
+      "wf-imagewall｜用：原文已有多张图片"
+    );
+    expect(prompt.userPrompt).toContain("为好看虚构图片");
   });
 
   it("includes concrete quality feedback when retrying", () => {
