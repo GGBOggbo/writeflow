@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkflowContext } from "./workflow-context";
 import { ChatPanel } from "./chat-panel";
@@ -32,6 +33,10 @@ export function WorkspaceShell() {
     handleCancelResetWorkflow,
     handleConfirmResetWorkflow,
   } = useWorkflowContext();
+
+  useEffect(() => {
+    router.prefetch("/payment");
+  }, [router]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -130,6 +135,12 @@ export function WorkspaceShell() {
                       ? "管理员生成不消耗积分"
                       : "每阶段首次免费，重新生成扣 0.05 积分"}
                   </p>
+                  <Link
+                    href="/payment"
+                    className="mt-3 inline-flex min-h-9 items-center justify-center rounded-full bg-white/78 px-4 text-sm font-semibold text-[#7c3f1f] transition hover:-translate-y-0.5 hover:bg-white"
+                  >
+                    充值积分
+                  </Link>
                 </div>
                 <div className="flex flex-wrap content-start gap-2 sm:max-w-[210px]">
                 {resetPending ? (

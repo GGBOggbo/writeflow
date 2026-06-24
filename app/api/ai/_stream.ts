@@ -20,6 +20,7 @@ import {
   logResponseHeaders,
   withRequestLogContext,
 } from "@/lib/logging/request-context";
+import { serverErrorResponse } from "./_shared";
 
 type StreamPayload<T> =
   | { type: "progress"; event: WorkflowProgressEvent }

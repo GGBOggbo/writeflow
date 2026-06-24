@@ -44,6 +44,10 @@ describe("WorkspaceShell", () => {
     expect(
       screen.getByText("每阶段首次免费，重新生成扣 0.05 积分")
     ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "充值积分" })).toHaveAttribute(
+      "href",
+      "/payment"
+    );
   });
 
   it("lets returning users reopen the guided tour", async () => {

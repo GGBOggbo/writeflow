@@ -24,10 +24,11 @@ export const config = {
      * 保护除了以下路径之外的所有页面：
      * - / (首页落地页，未登录可看)
      * - /login (登录页)
+     * - /payment (静态充值页，创建订单 API 再做登录校验)
      * - /api (API 路由)
      * - /_next (Next.js 内部资源)
      * - 静态资源
      */
-    "/((?!$|login|reset-password|api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!$|login|reset-password|payment|api|_next/static|_next/image|favicon.ico).*)",
   ],
 };

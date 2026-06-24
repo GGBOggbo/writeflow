@@ -223,7 +223,7 @@ export class CreditStore {
           [userId, workflowId, stage, operationId]
         );
 
-        if (pending.rowCount > 0) {
+        if ((pending.rowCount ?? 0) > 0) {
           throw new CreditConflictError("该步骤已有生成请求正在进行。");
         }
 
@@ -248,7 +248,7 @@ export class CreditStore {
           [userId, workflowId, stage]
         );
 
-        if (pending.rowCount > 0) {
+        if ((pending.rowCount ?? 0) > 0) {
           throw new CreditConflictError("该步骤已有生成请求正在进行。");
         }
 
@@ -260,7 +260,7 @@ export class CreditStore {
         );
 
         cost =
-          consumed.rowCount > 0
+          (consumed.rowCount ?? 0) > 0
             ? REGENERATION_CREDIT_COST_UNITS
             : FREE_GENERATION_CREDIT_COST_UNITS;
 
