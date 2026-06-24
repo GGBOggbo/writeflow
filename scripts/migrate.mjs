@@ -13,6 +13,9 @@ import { DatabaseSync } from "node:sqlite";
 import { Pool } from "@neondatabase/serverless";
 
 const provider = (process.env.DATABASE_PROVIDER || "postgres").toLowerCase();
+const INITIAL_CREDIT_UNITS = 500;
+const REGENERATION_CREDIT_COST_UNITS = 5;
+const CREDIT_UNITS_MIGRATION_KEY = "credit-units-v1";
 
 if (provider === "sqlite") {
   migrateSqlite();
@@ -93,9 +96,15 @@ function migrateSqlite() {
       "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS workflow_schema_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS workflow_credit_accounts (
       "userId" TEXT PRIMARY KEY,
-      balance INTEGER NOT NULL DEFAULT 5 CHECK (balance >= 0),
+      balance INTEGER NOT NULL DEFAULT 500 CHECK (balance >= 0),
       "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -103,8 +112,9 @@ function migrateSqlite() {
     CREATE TABLE IF NOT EXISTS workflow_credit_operations (
       "userId" TEXT NOT NULL,
       "operationId" TEXT NOT NULL,
+      "workflowId" TEXT,
       stage TEXT NOT NULL,
-      cost INTEGER NOT NULL DEFAULT 1,
+      cost INTEGER NOT NULL DEFAULT 5,
       status TEXT NOT NULL CHECK (status IN ('pending', 'consumed', 'refunded')),
       "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -129,6 +139,7 @@ function migrateSqlite() {
       ON auth_otp_challenges ("ipHash", purpose, "createdAt");
   `);
 
+  migrateSqliteCreditUnits(database);
   seedSqliteAdmins(database);
   database.close();
   console.log("\nSQLite migration complete!");
@@ -223,9 +234,18 @@ async function migratePostgres() {
   console.log("  ✓ user.role column");
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS workflow_schema_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  console.log("  ✓ workflow_schema_meta");
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS workflow_credit_accounts (
       "userId" TEXT PRIMARY KEY,
-      balance INTEGER NOT NULL DEFAULT 5 CHECK (balance >= 0),
+      balance INTEGER NOT NULL DEFAULT ${INITIAL_CREDIT_UNITS} CHECK (balance >= 0),
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -236,8 +256,9 @@ async function migratePostgres() {
     CREATE TABLE IF NOT EXISTS workflow_credit_operations (
       "userId" TEXT NOT NULL,
       "operationId" TEXT NOT NULL,
+      "workflowId" TEXT,
       stage TEXT NOT NULL,
-      cost INTEGER NOT NULL DEFAULT 1,
+      cost INTEGER NOT NULL DEFAULT ${REGENERATION_CREDIT_COST_UNITS},
       status TEXT NOT NULL CHECK (status IN ('pending', 'consumed', 'refunded')),
       "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -245,6 +266,30 @@ async function migratePostgres() {
     );
   `);
   console.log("  ✓ workflow_credit_operations");
+
+  await pool.query(`
+    ALTER TABLE workflow_credit_operations
+      ADD COLUMN IF NOT EXISTS "workflowId" TEXT;
+    ALTER TABLE workflow_credit_accounts
+      ALTER COLUMN balance SET DEFAULT ${INITIAL_CREDIT_UNITS};
+    ALTER TABLE workflow_credit_operations
+      ALTER COLUMN cost SET DEFAULT ${REGENERATION_CREDIT_COST_UNITS};
+
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM workflow_schema_meta
+        WHERE key = '${CREDIT_UNITS_MIGRATION_KEY}'
+      ) THEN
+        UPDATE workflow_credit_accounts SET balance = balance * 100;
+        UPDATE workflow_credit_operations SET cost = cost * 100;
+        INSERT INTO workflow_schema_meta (key, value, "updatedAt")
+        VALUES ('${CREDIT_UNITS_MIGRATION_KEY}', 'applied', NOW())
+        ON CONFLICT (key) DO NOTHING;
+      END IF;
+    END $$;
+  `);
+  console.log("  ✓ credit units migration");
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS auth_otp_challenges (
@@ -269,6 +314,35 @@ async function migratePostgres() {
   await seedPostgresAdmins(pool);
   await pool.end();
   console.log("\nPostgreSQL migration complete!");
+}
+
+function migrateSqliteCreditUnits(database) {
+  const columns = database
+    .prepare("PRAGMA table_info(workflow_credit_operations)")
+    .all();
+
+  if (!columns.some((column) => column.name === "workflowId")) {
+    database.exec(
+      'ALTER TABLE workflow_credit_operations ADD COLUMN "workflowId" TEXT;'
+    );
+  }
+
+  const marker = database
+    .prepare("SELECT value FROM workflow_schema_meta WHERE key = ?")
+    .get(CREDIT_UNITS_MIGRATION_KEY);
+
+  if (marker) {
+    console.log("  ✓ credit units migration already applied");
+    return;
+  }
+
+  database.exec(`
+    UPDATE workflow_credit_accounts SET balance = balance * 100;
+    UPDATE workflow_credit_operations SET cost = cost * 100;
+    INSERT INTO workflow_schema_meta (key, value, "updatedAt")
+    VALUES ('${CREDIT_UNITS_MIGRATION_KEY}', 'applied', CURRENT_TIMESTAMP);
+  `);
+  console.log("  ✓ credit units migration");
 }
 
 function parseSqlitePath(databaseUrl) {

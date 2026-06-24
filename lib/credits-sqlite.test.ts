@@ -156,4 +156,62 @@ describe("SqliteCreditStore", () => {
       store.reserve("regular-user", "outline", "op-2", "workflow-a")
     ).rejects.toThrow(CreditConflictError);
   });
+
+  it("migrates legacy integer credits to fixed units exactly once", async () => {
+    const legacy = new DatabaseSync(":memory:");
+    legacy.exec(`
+      CREATE TABLE "user" (
+        id TEXT PRIMARY KEY,
+        role TEXT NOT NULL DEFAULT 'user'
+      );
+      INSERT INTO "user" (id, role) VALUES ('regular-user', 'user');
+
+      CREATE TABLE workflow_credit_accounts (
+        "userId" TEXT PRIMARY KEY,
+        balance INTEGER NOT NULL DEFAULT 5 CHECK (balance >= 0),
+        "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE workflow_credit_operations (
+        "userId" TEXT NOT NULL,
+        "operationId" TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        cost INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'consumed', 'refunded')),
+        "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY ("userId", "operationId")
+      );
+
+      INSERT INTO workflow_credit_accounts ("userId", balance)
+      VALUES ('regular-user', 5);
+      INSERT INTO workflow_credit_operations
+        ("userId", "operationId", stage, cost, status)
+      VALUES ('regular-user', 'legacy-op', 'topics', 1, 'consumed');
+    `);
+
+    const legacyStore = new SqliteCreditStore(legacy);
+    await expect(legacyStore.getBalance("regular-user")).resolves.toEqual({
+      unlimited: false,
+      remaining: 5,
+    });
+    await expect(legacyStore.getBalance("regular-user")).resolves.toEqual({
+      unlimited: false,
+      remaining: 5,
+    });
+
+    const account = legacy
+      .prepare('SELECT balance FROM workflow_credit_accounts WHERE "userId" = ?')
+      .get("regular-user") as { balance: number };
+    const operation = legacy
+      .prepare(
+        'SELECT cost, "workflowId" FROM workflow_credit_operations WHERE "operationId" = ?'
+      )
+      .get("legacy-op") as { cost: number; workflowId: string | null };
+
+    expect(account.balance).toBe(500);
+    expect(operation.cost).toBe(100);
+    expect(operation.workflowId).toBeNull();
+  });
 });
