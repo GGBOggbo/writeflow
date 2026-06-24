@@ -40,11 +40,11 @@ describe("AI routes", () => {
   beforeEach(() => {
     creditMocks.reserve.mockReset().mockReturnValue({
       unlimited: false,
-      remaining: 4,
+      remaining: 5,
     });
     creditMocks.consume.mockReset().mockReturnValue({
       unlimited: false,
-      remaining: 4,
+      remaining: 4.95,
     });
     creditMocks.refund.mockReset().mockReturnValue({
       unlimited: false,
@@ -57,7 +57,7 @@ describe("AI routes", () => {
     vi.restoreAllMocks();
   });
 
-  it("charges a credit when the topics route succeeds", async () => {
+  it("meters the topics route with the confirmed workflow id", async () => {
     let handlerContext: ReturnType<typeof getLogContext>;
     vi.spyOn(aiService, "generateTopics").mockImplementationOnce(async () => {
       handlerContext = getLogContext();
@@ -102,11 +102,12 @@ describe("AI routes", () => {
       stage: "topics",
     });
     expect(json.topics.length).toBeGreaterThan(0);
-    expect(response.headers.get("X-Credits-Remaining")).toBe("4");
+    expect(response.headers.get("X-Credits-Remaining")).toBe("4.95");
     expect(creditMocks.reserve).toHaveBeenCalledWith(
       "test-user",
       "topics",
-      operationId
+      operationId,
+      workflowId
     );
     expect(creditMocks.consume).toHaveBeenCalledWith(
       "test-user",
@@ -146,7 +147,8 @@ describe("AI routes", () => {
     expect(creditMocks.reserve).toHaveBeenCalledWith(
       "test-user",
       "topics",
-      operationId
+      operationId,
+      workflowId
     );
     expect(creditMocks.consume).toHaveBeenCalledWith(
       "test-user",
@@ -167,9 +169,16 @@ describe("AI routes", () => {
     });
 
     const response = await postTopics(request);
+    const confirmedWorkflowId = response.headers.get("X-Workflow-Id");
 
-    expect(response.headers.get("X-Workflow-Id")).toMatch(/[0-9a-f-]{36}/);
+    expect(confirmedWorkflowId).toMatch(/[0-9a-f-]{36}/);
     expect(response.headers.get("X-Request-Id")).toMatch(/[0-9a-f-]{36}/);
+    expect(creditMocks.reserve).toHaveBeenCalledWith(
+      "test-user",
+      "topics",
+      operationId,
+      confirmedWorkflowId
+    );
   });
 
 
@@ -223,7 +232,8 @@ describe("AI routes", () => {
     expect(creditMocks.reserve).toHaveBeenCalledWith(
       "test-user",
       "draft",
-      operationId
+      operationId,
+      workflowId
     );
     expect(creditMocks.consume).toHaveBeenCalledWith("test-user", operationId);
     expect(creditMocks.reserve).toHaveBeenCalledTimes(1);

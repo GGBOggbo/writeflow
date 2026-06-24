@@ -102,12 +102,18 @@ export async function streamJsonResponse<
         userIdHash: await hashUserId(userId),
       },
       async () => {
+        const workflowId = getLogContext()?.workflowId;
+
+        if (!workflowId) {
+          return serverErrorResponse(new Error("缺少工作流标识。"));
+        }
+
         try {
           log.info("credits", "reserve started", {
             event: "credits.reserve.started",
             status: "started",
           });
-          await creditStore.reserve(userId, stage, input.operationId);
+          await creditStore.reserve(userId, stage, input.operationId, workflowId);
           log.info("credits", "reserve succeeded", {
             event: "credits.reserve.succeeded",
             status: "succeeded",
