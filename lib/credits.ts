@@ -3,9 +3,13 @@ import type { CreditBalance } from "@/types/credits";
 import {
   AI_STAGES,
   CREDIT_COST_PER_GENERATION,
+  CREDIT_UNITS_PER_CREDIT,
   CreditConflictError,
+  FREE_GENERATION_CREDIT_COST_UNITS,
   INITIAL_CREDITS,
   InsufficientCreditsError,
+  REGENERATION_CREDIT_COST_UNITS,
+  creditUnitsToAmount,
   type AiStage,
 } from "./credits-core";
 import { getDatabaseConfig, getPostgresPool, getSqliteDatabase } from "./database";
@@ -14,9 +18,13 @@ import { SqliteCreditStore } from "./credits-sqlite";
 export {
   AI_STAGES,
   CREDIT_COST_PER_GENERATION,
+  CREDIT_UNITS_PER_CREDIT,
   CreditConflictError,
+  FREE_GENERATION_CREDIT_COST_UNITS,
   INITIAL_CREDITS,
   InsufficientCreditsError,
+  REGENERATION_CREDIT_COST_UNITS,
+  creditUnitsToAmount,
   type AiStage,
 };
 

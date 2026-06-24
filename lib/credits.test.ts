@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  CREDIT_UNITS_PER_CREDIT,
   CreditConflictError,
   CreditStore,
+  INITIAL_CREDITS,
   InsufficientCreditsError,
+  REGENERATION_CREDIT_COST_UNITS,
+  creditUnitsToAmount,
 } from "./credits";
 
 /**
@@ -186,6 +190,14 @@ describe("CreditStore", () => {
     pool.setUserRole("regular-user", "user");
     pool.setUserRole("admin-user", "admin");
     store = new CreditStore(pool as unknown as import("@neondatabase/serverless").Pool);
+  });
+
+  it("uses fixed credit units for display balances", () => {
+    expect(CREDIT_UNITS_PER_CREDIT).toBe(100);
+    expect(INITIAL_CREDITS).toBe(500);
+    expect(REGENERATION_CREDIT_COST_UNITS).toBe(5);
+    expect(creditUnitsToAmount(500)).toBe(5);
+    expect(creditUnitsToAmount(495)).toBe(4.95);
   });
 
   it("gives a regular user five initial credits", async () => {
