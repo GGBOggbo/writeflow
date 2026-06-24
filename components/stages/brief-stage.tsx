@@ -196,7 +196,7 @@ export function BriefStage() {
         onClick={() => void handleConfirmBrief()}
         disabled={loading || !canGenerate}
       >
-        {loading ? "正在生成大纲..." : canGenerate ? "确认提纲" : "积分不足"}
+        {loading ? "正在生成大纲..." : canGenerate ? "确认提纲" : "余额不足时会提示"}
       </button>
     </section>
   );

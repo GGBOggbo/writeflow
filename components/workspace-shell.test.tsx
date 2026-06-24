@@ -41,7 +41,9 @@ describe("WorkspaceShell", () => {
 
     expect(screen.getByText("剩余积分")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("每次生成消耗 1 积分")).toBeInTheDocument();
+    expect(
+      screen.getByText("每阶段首次免费，重新生成扣 0.05 积分")
+    ).toBeInTheDocument();
   });
 
   it("lets returning users reopen the guided tour", async () => {
@@ -76,7 +78,9 @@ describe("WorkspaceShell", () => {
     ).toBeInTheDocument();
   });
 
-  it("disables paid generation when no credits remain", () => {
+  it("does not treat zero balance as a universal generation blocker", async () => {
+    const user = userEvent.setup();
+
     render(
       <WorkflowProvider
         initialCreditBalance={{ unlimited: false, remaining: 0 }}
@@ -86,7 +90,13 @@ describe("WorkspaceShell", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /积分不足/i })
-    ).toBeDisabled();
+      screen.getByText("每阶段首次免费，重新生成扣 0.05 积分")
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("核心想法"), "写一个新选题");
+
+    expect(
+      screen.getByRole("button", { name: /生成选题方向/i })
+    ).not.toBeDisabled();
   });
 });

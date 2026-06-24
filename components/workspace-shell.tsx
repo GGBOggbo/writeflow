@@ -62,10 +62,6 @@ export function WorkspaceShell() {
   const enabledSearchStages = [
     state.searchSettings.topics ? "选题联网搜索" : null,
   ].filter(Boolean);
-  const hasNoCredits =
-    creditBalance !== null &&
-    !creditBalance.unlimited &&
-    creditBalance.remaining === 0;
   const creditValue = creditBalance?.unlimited
     ? "∞"
     : creditBalance?.remaining ?? "—";
@@ -107,17 +103,13 @@ export function WorkspaceShell() {
                 <div
                   data-onboarding-target="credits"
                   aria-label={
-                    hasNoCredits
-                      ? "积分不足"
-                      : creditBalance?.unlimited
-                        ? "无限积分"
-                        : `剩余 ${creditValue} 积分`
+                    creditBalance?.unlimited
+                      ? "无限积分"
+                      : `剩余 ${creditValue} 积分，每阶段首次免费`
                   }
                   className={[
                     "min-w-[184px] rounded-[24px] border px-5 py-4 shadow-sm",
-                    hasNoCredits
-                      ? "border-[rgba(156,42,37,0.2)] bg-[#fdecea] text-[#8d2925]"
-                      : "border-[rgba(190,112,65,0.2)] bg-[linear-gradient(135deg,#fff5e8,#fbe2cb)] text-[#7c3f1f]",
+                    "border-[rgba(190,112,65,0.2)] bg-[linear-gradient(135deg,#fff5e8,#fbe2cb)] text-[#7c3f1f]",
                   ].join(" ")}
                 >
                   <div className="flex items-end justify-between gap-5">
@@ -130,13 +122,13 @@ export function WorkspaceShell() {
                       </p>
                     </div>
                     <span className="mb-1 rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">
-                      {hasNoCredits ? "积分不足" : "可用"}
+                      {creditBalance?.unlimited ? "无限" : "可用"}
                     </span>
                   </div>
                   <p className="mt-3 border-t border-current/10 pt-2 text-xs opacity-75">
                     {creditBalance?.unlimited
                       ? "管理员生成不消耗积分"
-                      : "每次生成消耗 1 积分"}
+                      : "每阶段首次免费，重新生成扣 0.05 积分"}
                   </p>
                 </div>
                 <div className="flex flex-wrap content-start gap-2 sm:max-w-[210px]">

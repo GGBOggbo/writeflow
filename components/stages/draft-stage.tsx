@@ -190,7 +190,7 @@ export function DraftStage() {
             ? "正在处理..."
             : canGenerate
               ? "生成标题和摘要"
-              : "积分不足"}
+              : "余额不足时会提示"}
         </button>
       </div>
     </section>

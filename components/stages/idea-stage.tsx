@@ -57,7 +57,7 @@ export function IdeaStage() {
         onClick={() => void handleGenerateTopics()}
         disabled={loading || !state.ideaInput.trim() || !canGenerate}
       >
-        {loading ? "生成中..." : canGenerate ? "生成选题方向" : "积分不足"}
+        {loading ? "生成中..." : canGenerate ? "生成选题方向" : "余额不足时会提示"}
       </button>
     </section>
   );

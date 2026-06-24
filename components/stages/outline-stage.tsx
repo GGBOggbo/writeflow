@@ -90,7 +90,7 @@ export function OutlineStage() {
         onClick={() => void handleGenerateDrafts()}
         disabled={loading || !canGenerate}
       >
-        {loading ? "正在生成正文版本..." : canGenerate ? "生成正文版本" : "积分不足"}
+        {loading ? "正在生成正文版本..." : canGenerate ? "生成正文版本" : "余额不足时会提示"}
       </button>
     </section>
   );

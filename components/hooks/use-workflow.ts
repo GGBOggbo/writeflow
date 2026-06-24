@@ -92,7 +92,7 @@ export function useWorkflow(
   const canGenerate =
     creditBalance === null ||
     creditBalance.unlimited ||
-    creditBalance.remaining > 0;
+    creditBalance.remaining >= 0;
 
   // -- localStorage persistence --
 
