@@ -20,7 +20,7 @@ describe("WechatFormatPanel", () => {
     const preview = screen.getByLabelText("公众号排版预览");
     expect(preview.innerHTML).toContain("本地预览标题");
     expect(preview).toHaveAttribute("data-theme", "wechat-native");
-    expect(screen.queryByText(/消耗 1 积分/)).toBeNull();
+    expect(screen.queryByText(/消耗\s*1\s*积分/)).toBeNull();
   });
 
   it("presents the default preview as Writeflow blue and keeps Claude warm", async () => {
